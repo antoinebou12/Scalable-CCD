@@ -196,6 +196,25 @@ void sort_and_sweep(
 
     sort_along_axis(sort_axis, boxes);
     sweep(boxes, sort_axis, overlaps);
+
+    ArrayMax3 sum_centers = ArrayMax3::Zero(boxes[0].min.size());
+    ArrayMax3 sum_centers_sqr = ArrayMax3::Zero(boxes[0].min.size());
+    for (const Aabb& box : boxes) {
+        ArrayMax3 center = (box.min + box.max) / 2;
+        sum_centers += center;
+        sum_centers_sqr += center.square();
+    }
+
+    const ArrayMax3 variance =
+        sum_centers_sqr - sum_centers.square() / boxes.size();
+
+    sort_axis = 0;
+    if (variance[1] > variance[0]) {
+        sort_axis = 1;
+    }
+    if (variance[2] > variance[sort_axis]) {
+        sort_axis = 2;
+    }
 }
 
 } // namespace scalable_ccd::stq
