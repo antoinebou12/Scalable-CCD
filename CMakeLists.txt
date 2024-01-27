@@ -128,7 +128,7 @@ target_link_libraries(scalable_ccd PUBLIC TBB::tbb)
 
 # Logger
 include(spdlog)
-target_link_libraries(scalable_ccd PUBLIC spdlog::spdlog)
+target_link_libraries(scalable_ccd PRIVATE spdlog::spdlog)
 
 # JSON
 target_link_libraries(scalable_ccd PRIVATE nlohmann_json::nlohmann_json)
@@ -217,41 +217,5 @@ endif()
 # Binary
 ################################################################################
 if(SCALABLE_CCD_TOPLEVEL_PROJECT)
-  # executable
-  add_executable(scalable_ccd_bin)
-
-  # Add source and header files to scalable_ccd_bin
-  add_subdirectory("${PROJECT_SOURCE_DIR}/app")
-
-  set_target_properties(scalable_ccd_bin PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  set_property(TARGET scalable_ccd_bin PROPERTY CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
-
-  # Link libraries
-  target_link_libraries(scalable_ccd_bin PRIVATE scalable_ccd::scalable_ccd)
-
-  # libigl
-  include(libigl)
-  target_link_libraries(scalable_ccd PUBLIC igl::core)
-
-  # JSON
-  include(json)
-  target_link_libraries(scalable_ccd_bin PRIVATE nlohmann_json::nlohmann_json)
-
-  if(APPLE)
-    # We need to add the path to the driver (libcuda.dylib) as an rpath,
-    # so that the static cuda runtime can find it at runtime.
-    set_property(TARGET scalable_ccd_bin
-                 PROPERTY
-                 BUILD_RPATH ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-  endif()
-
-  target_compile_options(scalable_ccd_bin PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
-    --generate-line-info
-    --use_fast_math
-    --relocatable-device-code=true
-    --ptxas-options=-v
-
-    # --maxrregcount=7
-    -fPIC # https://stackoverflow.com/questions/5311515/gcc-fpic-option
-  >)
+  add_subdirectory(apps)
 endif()
