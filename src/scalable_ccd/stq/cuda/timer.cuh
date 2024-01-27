@@ -2,7 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 class CudaTimer {
     cudaEvent_t _start, _end;
@@ -149,4 +149,4 @@ recordLaunch(char* tag, Fun (*f)(Arguments...), Arguments... args)
     return res;
 };
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

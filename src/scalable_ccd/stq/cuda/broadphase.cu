@@ -17,7 +17,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 extern MemHandler* memhandle;
 
@@ -470,4 +470,4 @@ void runBroadPhase(
 #endif
     spdlog::trace("Next threadstart {:d}", tidstart);
 }
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

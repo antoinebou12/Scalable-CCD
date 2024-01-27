@@ -5,8 +5,6 @@ set(SOURCES
     broadphase.cuh
     collision.cu
     collision.cuh
-    groundtruth.cu
-    groundtruth.cuh
     io.cu
     io.cuh
     memory.cuh
@@ -17,7 +15,6 @@ set(SOURCES
     sweep.cu
     sweep.cuh
     timer.cuh
-    types.cu
     types.cuh
     util.cu
     util.cuh

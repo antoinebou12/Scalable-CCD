@@ -5,7 +5,7 @@
 #include <spdlog/spdlog.h>
 #include <cuda/semaphore>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 #define gpuErrchk(ans)                                                         \
     {                                                                          \
@@ -210,4 +210,4 @@ extern MemHandler* memhandle;
 
 // cudaMallocManaged(&memhandle, sizeof(MemHandler));
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

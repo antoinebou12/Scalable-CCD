@@ -3,7 +3,7 @@
 #include <scalable_ccd/stq/cuda/aabb.cuh>
 #include <scalable_ccd/stq/cuda/memory.cuh>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 #define BLOCK_SIZE_1D 32 // sqrt(MAX_BLOCK_SIZE)
 // #define MAX_BLOCK_SIZE 1024 //for 1080Ti, V100
@@ -46,4 +46,4 @@ __device__ bool does_collide(const MiniBox& a, const MiniBox& b);
 __device__ void
 append_queue(const int2& lastcheck, int inc, int2* queue, unsigned* end);
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

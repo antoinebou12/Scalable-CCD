@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-namespace ccd {
+namespace scalable_ccd {
 class CudaTimer {
     cudaEvent_t _start, _end;
     std::vector<std::pair<std::string, float>> _records;
@@ -146,4 +146,4 @@ recordLaunch(char* tag, Fun (*f)(Arguments...), Arguments... args)
     return res;
 };
 
-} // namespace ccd
+} // namespace scalable_ccd

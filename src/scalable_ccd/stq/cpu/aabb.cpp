@@ -3,7 +3,7 @@
 
 #include <tbb/parallel_for.h>
 
-namespace stq::cpu {
+namespace scalable_ccd::stq::cpu {
 
 void constructBoxes(
     const Eigen::MatrixXd& vertices_t0,
@@ -116,4 +116,4 @@ void addFaces(
         });
 }
 
-} // namespace stq::cpu
+} // namespace scalable_ccd::stq::cpu

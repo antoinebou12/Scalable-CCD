@@ -3,7 +3,7 @@
 // #include <cooperative_groups.h>
 // using namespace cooperative_groups;
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 __global__ void count_collisions(Aabb* boxes, int* count, int N)
 {
@@ -183,4 +183,4 @@ get_collision_pairs_old(Aabb* boxes, int* count, int2* overlaps, int N, int G)
         add_overlap(threadRowId, threadColId, count, overlaps, G);
 }
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

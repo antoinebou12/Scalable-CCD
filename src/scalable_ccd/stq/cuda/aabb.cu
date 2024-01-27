@@ -8,7 +8,7 @@
 
 #include <tbb/parallel_for.h>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 __host__ __device__ bool is_face(const Aabb& x) { return x.vertexIds.z >= 0; };
 
@@ -197,4 +197,4 @@ void addFaces(
     merge_local_boxes(storages, boxes);
 };
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

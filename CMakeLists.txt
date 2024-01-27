@@ -122,10 +122,6 @@ target_compile_definitions(scalable_ccd PUBLIC NOMINMAX)
 include(eigen)
 target_link_libraries(scalable_ccd PUBLIC Eigen3::Eigen)
 
-# libigl
-include(libigl)
-target_link_libraries(scalable_ccd PUBLIC igl::core)
-
 # TBB
 include(onetbb)
 target_link_libraries(scalable_ccd PUBLIC TBB::tbb)
@@ -134,10 +130,10 @@ target_link_libraries(scalable_ccd PUBLIC TBB::tbb)
 include(spdlog)
 target_link_libraries(scalable_ccd PUBLIC spdlog::spdlog)
 
-if(SCALABLE_CCD_TOI_PER_QUERY)
-  # JSON
-  target_link_libraries(${PROJECT_NAME} PRIVATE nlohmann_json::nlohmann_json)
+# JSON
+target_link_libraries(scalable_ccd PRIVATE nlohmann_json::nlohmann_json)
 
+if(SCALABLE_CCD_TOI_PER_QUERY)
   # rational-cpp (requires GMP)
   include(rational_cpp)
   target_link_libraries(ipc_toolkit PUBLIC rational::rational)
@@ -222,12 +218,20 @@ endif()
 ################################################################################
 if(SCALABLE_CCD_TOPLEVEL_PROJECT)
   # executable
-  add_executable(scalable_ccd_bin "app/main.cpp")
+  add_executable(scalable_ccd_bin)
+
+  # Add source and header files to scalable_ccd_bin
+  add_subdirectory("${PROJECT_SOURCE_DIR}/app")
+
   set_target_properties(scalable_ccd_bin PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   set_property(TARGET scalable_ccd_bin PROPERTY CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
 
   # Link libraries
   target_link_libraries(scalable_ccd_bin PRIVATE scalable_ccd::scalable_ccd)
+
+  # libigl
+  include(libigl)
+  target_link_libraries(scalable_ccd PUBLIC igl::core)
 
   # JSON
   include(json)

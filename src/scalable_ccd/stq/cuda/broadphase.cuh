@@ -6,7 +6,7 @@
 #include <vector>
 #include <utility>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 void runBroadPhaseMultiGPU(
     const Aabb* boxes,
@@ -28,4 +28,4 @@ void runBroadPhase(
     int& tidstart,
     int& devcount,
     const int memlimit = 0);
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

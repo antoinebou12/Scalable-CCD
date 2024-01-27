@@ -1,21 +1,13 @@
 #pragma once
 
-#include <scalable_ccd/config.hpp>
+#include <scalable_ccd/common/scalar.hpp>
 
 #include <array>
 #include <vector>
 
 #include <Eigen/Core>
 
-namespace stq::cpu {
-
-#ifdef SCALABLE_CCD_WITH_DOUBLE
-typedef double Scalar;
-// #warning Using Double
-#else
-typedef float Scalar;
-// #warning Using Float
-#endif
+namespace scalable_ccd::stq::cpu {
 
 using ArrayMax3 =
     Eigen::Array<Scalar, Eigen::Dynamic, 1, Eigen::ColMajor, 3, 1>;
@@ -64,4 +56,4 @@ void addFaces(
     const Eigen::MatrixXi& faces,
     std::vector<Aabb>& boxes);
 
-} // namespace stq::cpu
+} // namespace scalable_ccd::stq::cpu

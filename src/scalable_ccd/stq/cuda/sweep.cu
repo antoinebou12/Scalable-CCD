@@ -6,7 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 __global__ void retrieve_collision_pairs(
     const Aabb* const boxes,
@@ -248,4 +248,4 @@ __global__ void runSTQ(
     }
 }
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

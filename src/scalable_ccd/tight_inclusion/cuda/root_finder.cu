@@ -1,9 +1,10 @@
 #include <scalable_ccd/config.hpp>
+#include <scalable_ccd/common/limits.cuh>
+// #include <scalable_ccd/tight_inclusion/cuda/rational.hpp>
+#include <scalable_ccd/tight_inclusion/cuda/record.hpp>
+#include <scalable_ccd/tight_inclusion/cuda/root_finder.cuh>
 
 #include <array>
-#include <ccdgpu/rational.hpp>
-#include <ccdgpu/record.hpp>
-#include <ccdgpu/root_finder.cuh>
 #include <float.h>
 #include <vector>
 
@@ -48,7 +49,7 @@ __device__ interval_pair::interval_pair(const Singleinterval& itv)
 
 __device__ bool sum_no_larger_1(const Scalar& num1, const Scalar& num2)
 {
-#ifdef GPUTI_USE_DOUBLE_PRECISION
+#ifdef SCALABLE_CCD_WITH_DOUBLE
     if (num1 + num2 > 1 / (1 - DBL_EPSILON)) {
         return false;
     }
@@ -160,7 +161,7 @@ std::array<Scalar, 3> get_numerical_error(
     Scalar eefilter;
     Scalar vffilter;
     if (!use_ms) {
-#ifdef GPUTI_USE_DOUBLE_PRECISION
+#ifdef SCALABLE_CCD_WITH_DOUBLE
         eefilter = 6.217248937900877e-15;
         vffilter = 6.661338147750939e-15;
 #else
@@ -169,7 +170,7 @@ std::array<Scalar, 3> get_numerical_error(
 #endif
     } else // using minimum separation
     {
-#ifdef GPUTI_USE_DOUBLE_PRECISION
+#ifdef SCALABLE_CCD_WITH_DOUBLE
         eefilter = 7.105427357601002e-15;
         vffilter = 7.549516567451064e-15;
 #else
@@ -214,13 +215,13 @@ get_numerical_error_vf_memory_pool(CCDData& data_in, bool use_ms)
     Scalar vffilter;
     //   bool use_ms = false;
     if (!use_ms) {
-#ifdef GPUTI_USE_DOUBLE_PRECISION
+#ifdef SCALABLE_CCD_WITH_DOUBLE
         vffilter = 6.661338147750939e-15;
 #else
         vffilter = 3.576279e-06;
 #endif
     } else {
-#ifdef GPUTI_USE_DOUBLE_PRECISION
+#ifdef SCALABLE_CCD_WITH_DOUBLE
         vffilter = 7.549516567451064e-15;
 #else
         vffilter = 4.053116e-06;
@@ -274,13 +275,13 @@ get_numerical_error_ee_memory_pool(CCDData& data_in, bool use_ms)
     //   bool use_ms = false;
     if (!use_ms) {
 
-#ifdef GPUTI_USE_DOUBLE_PRECISION
+#ifdef SCALABLE_CCD_WITH_DOUBLE
         vffilter = 6.217248937900877e-15;
 #else
         vffilter = 3.337861e-06;
 #endif
     } else {
-#ifdef GPUTI_USE_DOUBLE_PRECISION
+#ifdef SCALABLE_CCD_WITH_DOUBLE
         vffilter = 7.105427357601002e-15;
 #else
         vffilter = 3.814698e-06;
@@ -384,12 +385,12 @@ inline __device__ bool Origin_in_vf_inclusion_function_memory_pool(
     box_in = true;
     true_tol = 0.0;
     BoxPrimatives bp;
-    Scalar vmin = SCALAR_LIMIT;
-    Scalar vmax = -SCALAR_LIMIT;
+    Scalar vmin = cuda::numeric_limits<Scalar>::max();
+    Scalar vmax = -cuda::numeric_limits<Scalar>::max();
     Scalar value;
     for (bp.dim = 0; bp.dim < 3; bp.dim++) {
-        vmin = SCALAR_LIMIT;
-        vmax = -SCALAR_LIMIT;
+        vmin = cuda::numeric_limits<Scalar>::max();
+        vmax = -cuda::numeric_limits<Scalar>::max();
         for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
                 for (int k = 0; k < 2; k++) {
@@ -425,12 +426,12 @@ inline __device__ bool Origin_in_ee_inclusion_function_memory_pool(
     box_in = true;
     true_tol = 0.0;
     BoxPrimatives bp;
-    Scalar vmin = SCALAR_LIMIT;
-    Scalar vmax = -SCALAR_LIMIT;
+    Scalar vmin = cuda::numeric_limits<Scalar>::max();
+    Scalar vmax = -cuda::numeric_limits<Scalar>::max();
     Scalar value;
     for (bp.dim = 0; bp.dim < 3; bp.dim++) {
-        vmin = SCALAR_LIMIT;
-        vmax = -SCALAR_LIMIT;
+        vmin = cuda::numeric_limits<Scalar>::max();
+        vmax = -cuda::numeric_limits<Scalar>::max();
         for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
                 for (int k = 0; k < 2; k++) {
@@ -895,12 +896,12 @@ void run_memory_pool_ccd(
     std::vector<int>& result_list,
     int parallel_nbr,
     int max_iter,
-    ccd::Scalar tol,
+    Scalar tol,
     bool use_ms,
     bool allow_zero_toi,
-    ccd::Scalar& toi,
+    Scalar& toi,
     int& overflow,
-    gpu::Record& r)
+    Record& r)
 {
     int nbr = tmp_nbr;
     spdlog::trace("tmp_nbr {}", tmp_nbr);
@@ -944,7 +945,7 @@ void run_memory_pool_ccd(
     gpuErrchk(cudaMemcpy(
         d_config, config, sizeof(CCDConfig), cudaMemcpyHostToDevice));
     gpuErrchk(cudaGetLastError());
-    // ccd::Timer timer;
+    // Timer timer;
     // timer.start();
     spdlog::trace("nbr: {:d}, parallel_nbr {:d}", nbr, parallel_nbr);
     initialize_memory_pool<<<nbr / parallel_nbr + 1, parallel_nbr>>>(
@@ -961,7 +962,7 @@ void run_memory_pool_ccd(
     gpuErrchk(cudaDeviceSynchronize());
 
     spdlog::trace("MAX_QUERIES: {:d}", memhandle->MAX_QUERIES);
-    spdlog::trace("sizeof(Scalar) {:d}", sizeof(ccd::Scalar));
+    spdlog::trace("sizeof(Scalar) {:d}", sizeof(Scalar));
 
     int nbr_per_loop = nbr;
     int start;
@@ -989,7 +990,7 @@ void run_memory_pool_ccd(
         //            cudaMemcpyDeviceToHost);
         // cudaMemcpy(&end, &d_config[0].mp_end, sizeof(int),
         // cudaMemcpyDeviceToHost); cudaMemcpy(&toi, &d_config[0].toi,
-        // sizeof(ccd::Scalar),
+        // sizeof(Scalar),
         //            cudaMemcpyDeviceToHost);
         // spdlog::trace("toi {}", toi);
         // spdlog::trace("toi {:.4f}",  toi);
@@ -1005,7 +1006,7 @@ void run_memory_pool_ccd(
 
     // cudaMemcpy(res, d_res, result_size, cudaMemcpyDeviceToHost);
     gpuErrchk(cudaMemcpy(
-        &toi, &d_config[0].toi, sizeof(ccd::Scalar), cudaMemcpyDeviceToHost));
+        &toi, &d_config[0].toi, sizeof(Scalar), cudaMemcpyDeviceToHost));
     // int overflow;
     gpuErrchk(cudaMemcpy(
         &overflow, &d_config[0].overflow_flag, sizeof(int),

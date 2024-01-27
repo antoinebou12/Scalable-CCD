@@ -17,8 +17,9 @@
 // for convenience
 using json = nlohmann::json;
 
+#include "io.hpp"
+
 #include <scalable_ccd/stq/cpu/aabb.hpp>
-#include <scalable_ccd/stq/cpu/io.hpp>
 #include <scalable_ccd/stq/cpu/sweep.hpp>
 
 #include <nlohmann/json.hpp>
@@ -33,7 +34,7 @@ using json = nlohmann::json;
 #include <spdlog/spdlog.h>
 
 using namespace std;
-// using namespace stq::cpu;
+using namespace scalable_ccd;
 
 void compare_mathematica(vector<pair<int, int>> overlaps, const char* jsonPath)
 {
@@ -79,7 +80,8 @@ int main(int argc, char** argv)
     const char* filet1 = argv[2];
 
     vector<stq::cpu::Aabb> boxes;
-    stq::cpu::parseMesh(filet0, filet1, boxes);
+    parse_mesh(filet0, filet1, boxes);
+
     int N = boxes.size();
     int n = N;
     vector<stq::cpu::Aabb> boxes_batching;

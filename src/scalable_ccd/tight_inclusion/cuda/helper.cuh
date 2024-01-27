@@ -1,7 +1,7 @@
 #pragma once
-#include <ccdgpu/CType.cuh>
-#include <ccdgpu/Type.hpp>
-#include <ccdgpu/record.hpp>
+#include <scalable_ccd/common/scalar.cuh>
+#include <scalable_ccd/tight_inclusion/cuda/type.hpp>
+#include <scalable_ccd/tight_inclusion/cuda/record.hpp>
 #include <scalable_ccd/stq/cuda/aabb.cuh>
 #include <scalable_ccd/stq/cuda/memory.cuh>
 
@@ -9,7 +9,7 @@
 
 #include <vector>
 
-namespace ccd::gpu {
+namespace scalable_ccd {
 
 __global__ void addData(
     const int2* const overlaps,
@@ -82,4 +82,4 @@ Scalar compute_toi_strategy(
     Scalar min_distance,
     Scalar tolerance);
 
-} // namespace ccd::gpu
+} // namespace scalable_ccd

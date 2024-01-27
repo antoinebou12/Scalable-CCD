@@ -1,7 +1,7 @@
 #include <scalable_ccd/stq/cuda/queue.cuh>
 #include <iostream>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 __device__ int2 QUEUE_ERROR() { return make_int2(-1, -1); }
 
@@ -34,4 +34,4 @@ __device__ bool Queue::is_full() { return (end + 1) % HEAP_SIZE == start; }
 
 __device__ bool Queue::is_empty() { return end == start; }
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

@@ -1,10 +1,12 @@
 #pragma once
-#include <array>
-#include <ccdgpu/Type.hpp>
-#include <ccdgpu/record.hpp>
-#include <ccdgpu/timer.hpp>
-#include <vector>
+
+#include <scalable_ccd/common/timer.hpp>
 #include <scalable_ccd/stq/cuda/memory.cuh>
+#include <scalable_ccd/tight_inclusion/cuda/type.hpp>
+#include <scalable_ccd/tight_inclusion/cuda/record.hpp>
+
+#include <array>
+#include <vector>
 
 // #include <gputi/book.h>
 namespace scalable_ccd {
@@ -32,12 +34,12 @@ void run_memory_pool_ccd(
     std::vector<int>& result_list,
     int parallel_nbr,
     int max_iter,
-    ccd::Scalar tol,
+    Scalar tol,
     bool use_ms,
     bool allow_zero_toi,
-    ccd::Scalar& toi,
+    Scalar& toi,
     int& overflow,
-    gpu::Record& r);
+    Record& r);
 
 // get the filter of ccd. the inputs are the vertices of the bounding box of
 // the simulation scene this function is directly copied from

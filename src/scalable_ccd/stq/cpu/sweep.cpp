@@ -10,7 +10,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace stq::cpu {
+namespace scalable_ccd::stq::cpu {
 
 // typedef StructAlignment(32) std::array<_simd, 6> SimdObject;
 
@@ -178,4 +178,4 @@ void sweep_cpu_single_batch(
     n = std::min(static_cast<int>(boxes_batching.size()), n);
 }
 
-} // namespace stq::cpu
+} // namespace scalable_ccd::stq::cpu

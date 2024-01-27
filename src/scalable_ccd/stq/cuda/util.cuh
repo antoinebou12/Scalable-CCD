@@ -2,7 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 #define cudaCheckErrors(msg)                                                   \
     do {                                                                       \
@@ -36,4 +36,4 @@ struct sort_aabb_x : sorter {
     }
 };
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

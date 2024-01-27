@@ -1,27 +1,26 @@
 #include <scalable_ccd/config.hpp>
 
-#include <ccdgpu/CType.cuh>
-#include <ccdgpu/helper.cuh>
+#include <scalable_ccd/common/scalar.cuh>
+#include <scalable_ccd/tight_inclusion/cuda/helper.cuh>
 
 #include <fstream>
 #include <iostream>
 
 // #include <gputi/book.h>
 // #include <gputi/io.h>
-#include <ccdgpu/root_finder.cuh>
-#include <ccdgpu/timer.hpp>
+#include <scalable_ccd/tight_inclusion/cuda/root_finder.cuh>
 #include <scalable_ccd/stq/cuda/io.cuh>
 
-#include <ccdgpu/record.hpp>
+#include <scalable_ccd/tight_inclusion/cuda/record.hpp>
 #include <scalable_ccd/stq/cuda/memory.cuh>
 #include <scalable_ccd/stq/cuda/broadphase.cuh>
 
 #include <spdlog/spdlog.h>
 
 using namespace std;
-using namespace stq::gpu;
+using namespace scalable_ccd::stq::gpu;
 
-namespace ccd::gpu {
+namespace scalable_ccd {
 
 #define gpuErrchk(ans)                                                         \
     {                                                                          \
@@ -508,4 +507,4 @@ Scalar compute_toi_strategy(
     return earliest_toi;
 }
 
-} // namespace ccd::gpu
+} // namespace scalable_ccd

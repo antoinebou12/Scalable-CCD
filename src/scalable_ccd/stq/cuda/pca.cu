@@ -2,7 +2,7 @@
 #include <Eigen/Dense>
 #include <scalable_ccd/stq/cuda/pca.cuh>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 void nipalsPCA(Eigen::MatrixXd& vertices_t0, Eigen::MatrixXd& vertices_t1)
 {
@@ -47,4 +47,4 @@ void nipalsPCA(Eigen::MatrixXd& vertices_t0, Eigen::MatrixXd& vertices_t1)
     vertices_t1 = transformed_vertices.block(
         vertices_t0.rows(), 0, vertices_t1.rows(), n_components);
 }
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

@@ -13,7 +13,7 @@
 
 namespace cg = cooperative_groups;
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 __global__ void retrieve_collision_pairs(
     const Aabb* const boxes,
@@ -46,4 +46,4 @@ __global__ void runSAPVanilla(
     int* count,
     int* start,
     MemHandler* mem);
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

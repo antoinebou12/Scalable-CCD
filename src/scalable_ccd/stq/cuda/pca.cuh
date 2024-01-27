@@ -2,8 +2,8 @@
 
 #include <Eigen/Dense>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 void nipalsPCA(Eigen::MatrixXd& vertices_t0, Eigen::MatrixXd& vertices_t1);
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

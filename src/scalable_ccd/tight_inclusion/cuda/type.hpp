@@ -1,13 +1,12 @@
 #pragma once
 
 #include <scalable_ccd/config.hpp>
+#include <scalable_ccd/common/scalar.cuh>
 
 #include <array>
 #include <assert.h>
 #include <cudaProfiler.h>
 #include <cuda_profiler_api.h>
-// #include <gputi/read_rational_csv.cuh>
-#include <ccdgpu/CType.cuh>
 #include <cuda/semaphore>
 #include <limits>
 #include <utility>

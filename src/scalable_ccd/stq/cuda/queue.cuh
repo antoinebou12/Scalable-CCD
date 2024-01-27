@@ -3,7 +3,7 @@
 #include <spdlog/spdlog.h>
 #include <cuda/semaphore>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 static const int HEAP_SIZE = 64;
 // Use a sentinel value to indicate an error
@@ -42,4 +42,4 @@ public:
     __device__ bool is_empty();
 };
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

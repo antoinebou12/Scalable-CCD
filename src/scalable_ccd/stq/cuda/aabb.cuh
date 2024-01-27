@@ -10,7 +10,7 @@
 
 #include <scalable_ccd/stq/cuda/types.cuh>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 __global__ class Aabb {
 public:
@@ -135,4 +135,4 @@ public:
     ull rank_c;
 };
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

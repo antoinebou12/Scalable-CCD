@@ -5,7 +5,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace stq::gpu {
+namespace scalable_ccd::stq::gpu {
 
 // void setup(int devId, int &smemSize, int &threads, int &nboxes);
 
@@ -48,4 +48,4 @@ void setup(int devId, int& smemSize, int& threads, int& nbox)
     return;
 }
 
-} // namespace stq::gpu
+} // namespace scalable_ccd::stq::gpu

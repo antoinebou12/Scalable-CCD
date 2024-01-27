@@ -1,15 +1,17 @@
 #pragma once
+
+#include <scalable_ccd/common/timer.hpp>
+
 #include <stdio.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <ccdgpu/timer.hpp>
 
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
+#include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-namespace ccd::gpu {
+namespace scalable_ccd {
 
 // template <typename... Arguments>
 // void recordLaunch(char* tag, void(*f)(Arguments...), Arguments... args) {
@@ -23,7 +25,7 @@ namespace ccd::gpu {
 // };
 
 struct Record {
-    ccd::Timer timer;
+    Timer timer;
     cudaEvent_t start, stop;
     char* tag;
     json j_object;
@@ -92,4 +94,4 @@ struct Record {
     void Clear() { j_object.clear(); }
 };
 
-} // namespace ccd::gpu
+} // namespace scalable_ccd

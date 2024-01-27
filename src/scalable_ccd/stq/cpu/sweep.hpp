@@ -3,7 +3,7 @@
 #include <scalable_ccd/stq/cpu/aabb.hpp>
 #include <vector>
 
-namespace stq::cpu {
+namespace scalable_ccd::stq::cpu {
 
 bool is_face(const std::array<int, 3>& vids);
 
@@ -31,4 +31,4 @@ void sweep(
 
 void sort_along_xaxis(std::vector<Aabb>& boxes);
 
-} // namespace stq::cpu
+} // namespace scalable_ccd::stq::cpu
