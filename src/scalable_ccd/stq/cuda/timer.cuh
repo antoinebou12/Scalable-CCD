@@ -1,6 +1,9 @@
 #pragma once
-#include <vector>
-namespace ccd {
+
+#include <spdlog/spdlog.h>
+
+namespace stq::gpu {
+
 class CudaTimer {
     cudaEvent_t _start, _end;
     std::vector<std::pair<std::string, float>> _records;
@@ -56,19 +59,19 @@ void recordLaunch(
 
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
-        printf(
-            "Kernel launch failure %s\nTrying device-kernel launch\n",
+        spdlog::trace(
+            "Kernel launch failure {:s}\nTrying device-kernel launch",
             cudaGetErrorString(error));
         timer.tick();
         f(args...);
         timer.tock();
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
-            printf(
-                "Device-kernel launch failure %s\n", cudaGetErrorString(err));
+            spdlog::trace(
+                "Device-kernel launch failure {:s}", cudaGetErrorString(err));
     }
     double elapsed = timer.elapsed();
-    printf("%s : %.6f ms\n", tag, elapsed);
+    spdlog::trace("{:s} : {:.6f} ms", tag, elapsed);
     return;
 };
 
@@ -146,4 +149,4 @@ recordLaunch(char* tag, Fun (*f)(Arguments...), Arguments... args)
     return res;
 };
 
-} // namespace ccd
+} // namespace stq::gpu

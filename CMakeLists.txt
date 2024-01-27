@@ -1,139 +1,247 @@
-cmake_minimum_required(VERSION 3.24.0 FATAL_ERROR)
-
-# set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
-project(CCDGPU LANGUAGES CXX CUDA)
-
-SET(CUDA_SEPARABLE_COMPILATION ON)
-
-set(LIBIGL_WITH_COMISO OFF CACHE BOOL "Use CoMiso")
-set(LIBIGL_WITH_EMBREE OFF CACHE BOOL "Use Embree")
-set(LIBIGL_WITH_OPENGL OFF CACHE BOOL "Use OpenGL")
-set(LIBIGL_WITH_OPENGL_GLFW OFF CACHE BOOL "Use GLFW")
-set(LIBIGL_WITH_OPENGL_GLFW_IMGUI OFF CACHE BOOL "Use ImGui")
-set(LIBIGL_WITH_PNG OFF CACHE BOOL "Use PNG")
-set(LIBIGL_WITH_TETGEN OFF CACHE BOOL "Use Tetgen")
-set(LIBIGL_WITH_TRIANGLE OFF CACHE BOOL "Use Triangle")
-set(LIBIGL_WITH_PREDICATES ON CACHE BOOL "Use exact predicates")
-set(LIBIGL_WITH_XML OFF CACHE BOOL "Use XML")
-set(LIBIGL_WITH_PYTHON OFF CACHE BOOL "Use Python")
-set(CCDGPU_BROADPHASE_PATH "${PROJECT_SOURCE_DIR}/../broadphase-gpu")
-
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-  set(CCDGPU_TOPLEVEL_PROJECT ON)
+# Detects whether this is a top-level project
+get_directory_property(HAS_PARENT PARENT_DIRECTORY)
+if(HAS_PARENT)
+  set(SCALABLE_CCD_TOPLEVEL_PROJECT OFF)
 else()
-  set(CCDGPU_TOPLEVEL_PROJECT OFF)
+  set(SCALABLE_CCD_TOPLEVEL_PROJECT ON)
 endif()
 
-OPTION(GPUTI_WITH_DOUBLE_PRECISION "use double precision calculation" ON)
-OPTION(CCD_TOI_PER_QUERY "record symbolic toi per each query in json" OFF)
+# Check required CMake version
+set(REQUIRED_CMAKE_VERSION "3.18.0")
+if(SCALABLE_CCD_TOPLEVEL_PROJECT)
+  cmake_minimum_required(VERSION ${REQUIRED_CMAKE_VERSION})
+else()
+  # Don't use cmake_minimum_required here to avoid implicitly overriding parent policies
+  if(${CMAKE_VERSION} VERSION_LESS ${REQUIRED_CMAKE_VERSION})
+    message(FATAL_ERROR "CMake required version to build Scalable CCD is ${REQUIRED_CMAKE_VERSION}")
+  endif()
+endif()
 
-# ## Configuration
-# set(CCDGPU_EXTERNAL "${CMAKE_CURRENT_SOURCE_DIR}/external")
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
+# Include user-provided default options if available. We do that before the main
+# `project()` so that we can define the C/C++ compilers from the option file.
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ScalableCCDOptions.cmake)
+  message(STATUS "Using local options file: ${CMAKE_CURRENT_SOURCE_DIR}/ScalableCCDOptions.cmake")
+  include(${CMAKE_CURRENT_SOURCE_DIR}/ScalableCCDOptions.cmake)
+endif()
+
+# Enable ccache if available
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  option(SCALABLE_CCD_WITH_CCACHE "Enable ccache when building Scalable CCD" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
+else()
+  option(SCALABLE_CCD_WITH_CCACHE "Enable ccache when building Scalable CCD" OFF)
+endif()
+if(SCALABLE_CCD_WITH_CCACHE AND CCACHE_PROGRAM)
+  message(STATUS "Enabling Ccache support (${CCACHE_PROGRAM})")
+  set(ccacheEnv
+    CCACHE_BASEDIR=${CMAKE_BINARY_DIR}
+    CCACHE_SLOPPINESS=clang_index_store,include_file_ctime,include_file_mtime,locale,pch_defines,time_macros
+  )
+  foreach(lang IN ITEMS C CXX)
+    set(CMAKE_${lang}_COMPILER_LAUNCHER
+      ${CMAKE_COMMAND} -E env ${ccacheEnv} ${CCACHE_PROGRAM}
+    )
+  endforeach()
+endif()
+
+################################################################################
+# CMake Policies
+################################################################################
+
+cmake_policy(SET CMP0054 NEW) # Only interpret if() arguments as variables or keywords when unquoted.
+cmake_policy(SET CMP0076 NEW) # target_sources() command converts relative paths to absolute.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+  cmake_policy(SET CMP0135 NEW) # Set the timestamps of all extracted contents to the time of the extraction.
+endif()
+
+################################################################################
+
+project(ScalableCCD
+        DESCRIPTION "Sweep and Tiniest Queue & Tight-Inclusion GPU CCD"
+        LANGUAGES CXX
+        VERSION "0.1.0")
+
+option(SCALABLE_CCD_WITH_CUDA         "Enable CUDA CCD"                         OFF)
+OPTION(SCALABLE_CCD_WITH_DOUBLE       "Use double precision calculation"         ON)
+OPTION(SCALABLE_CCD_TOI_PER_QUERY     "Output time of impact per query in JSON" OFF)
+option(SCALABLE_CCD_KEEP_CPU_OVERLAPS "Keep CPU overlaps after CUDA method"     OFF)
+
+# Set default minimum C++ standard
+if(SCALABLE_CCD_TOPLEVEL_PROJECT)
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
+
+### Configuration
+set(SCALABLE_CCD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/scalable_ccd")
+set(SCALABLE_CCD_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/src")
+
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/scalable_ccd/")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/recipes/")
-include(Warnings)
-include(UseColors)
-include(CCDGPU_Utils)
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/find/")
 
-# ## the library
-add_subdirectory(src)
-prepend_current_path(CCDGPU_SOURCES)
-CCDGPU_copy_headers(${CCDGPU_SOURCES})
-CCDGPU_set_source_group(${CCDGPU_SOURCES})
-add_library(${PROJECT_NAME} STATIC ${CCDGPU_SOURCES})
-target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_BINARY_DIR}/include)
+# General CMake utils
+include(scalable_ccd_cpm_cache)
+include(scalable_ccd_use_colors)
 
-# target_link_libraries(CCDGPU PRIVATE warnings::all)
-target_compile_definitions(${PROJECT_NAME} PUBLIC NOMINMAX)
+# Generate position-independent code by default
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if(GPUTI_WITH_DOUBLE_PRECISION)
-  target_compile_definitions(${PROJECT_NAME} PUBLIC -DGPUTI_USE_DOUBLE_PRECISION)
-endif()
+################################################################################
+# Scalable CCD Library
+################################################################################
 
-if(CCD_TOI_PER_QUERY)
-  target_compile_definitions(${PROJECT_NAME} PUBLIC CCD_TOI_PER_QUERY)
-endif()
+# Add an empty library and fill in the list of sources in `src/scalable_ccd/CMakeLists.txt`.
+add_library(scalable_ccd)
+add_library(scalable_ccd::scalable_ccd ALIAS scalable_ccd)
 
-# Request that CCDGPU be built with -std=c++11
-# As this is a public compile feature anything that links to CCDGPU
-# will also build with -std=c++11
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
+# Fill in configuration options
+configure_file(
+  "${SCALABLE_CCD_SOURCE_DIR}/config.hpp.in"
+  "${SCALABLE_CCD_SOURCE_DIR}/config.hpp")
 
-# ###############################################################################
-# CUDA
-# ###############################################################################
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -use_fast_math --expt-relaxed-constexpr  -gencode arch=compute_86,code=sm_86")
+# Add source and header files to scalable_ccd
+add_subdirectory("${SCALABLE_CCD_SOURCE_DIR}")
 
-# We need to explicitly state that we need all CUDA files in the CCDGPU
-# library to be built with -dc as the member functions could be called by
-# other libraries and executables
-set_target_properties(${PROJECT_NAME}
-  PROPERTIES CUDA_SEPARABLE_COMPILATION ON
-)
+# Public include directory for Scalable CCD
+target_include_directories(scalable_ccd PUBLIC "${SCALABLE_CCD_INCLUDE_DIR}")
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES native)
+################################################################################
+# Optional Definitions
+################################################################################
 
-target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
-  --generate-line-info
-  --use_fast_math
-  --relocatable-device-code=true
+# For MSVC, do not use the min and max macros.
+target_compile_definitions(scalable_ccd PUBLIC NOMINMAX)
 
-  # --ptxas-options=-v
-  # --maxrregcount=7
-  -fPIC # https://stackoverflow.com/questions/5311515/gcc-fpic-option
-  >
-)
+################################################################################
+# Dependencies
+################################################################################
 
-# ###############################################################################
-# Required Libraries
-# ###############################################################################
-include(broadphase)
-target_link_libraries(${PROJECT_NAME} PUBLIC STQ::CUDA)
-
-# target_link_libraries(${PROJECT_NAME} PUBLIC gputi)
+# Eigen
+include(eigen)
+target_link_libraries(scalable_ccd PUBLIC Eigen3::Eigen)
 
 # libigl
-target_link_libraries(${PROJECT_NAME} PUBLIC igl::core)
+include(libigl)
+target_link_libraries(scalable_ccd PUBLIC igl::core)
 
-# JSON
-target_link_libraries(${PROJECT_NAME} PUBLIC nlohmann_json::nlohmann_json)
-
-# gmp
-if(CCD_TOI_PER_QUERY)
-  find_package(GMP)
-
-  IF(NOT ${GMP_FOUND})
-    MESSAGE(FATAL_ERROR "Cannot find GMP")
-  ENDIF()
-
-  target_include_directories(${PROJECT_NAME} PUBLIC ${GMP_INCLUDE_DIRS})
-  target_link_libraries(${PROJECT_NAME} PUBLIC ${GMP_LIBRARIES})
-endif()
-
-# target_link_libraries(${PROJECT_NAME} PUBLIC ipc_toolkit)
+# TBB
+include(onetbb)
+target_link_libraries(scalable_ccd PUBLIC TBB::tbb)
 
 # Logger
 include(spdlog)
-target_link_libraries(${PROJECT_NAME} PUBLIC spdlog::spdlog)
+target_link_libraries(scalable_ccd PUBLIC spdlog::spdlog)
 
-# ###############################################################################
-# Binary
-# ###############################################################################
-if(CCDGPU_TOPLEVEL_PROJECT)
-  # executable
-  add_executable(ccdgpu_bin app/main.cu)
-  set_target_properties(ccdgpu_bin PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  set_property(TARGET ccdgpu_bin PROPERTY CUDA_ARCHITECTURES native)
-  target_link_libraries(ccdgpu_bin PRIVATE ${PROJECT_NAME})
+if(SCALABLE_CCD_TOI_PER_QUERY)
+  # JSON
+  target_link_libraries(${PROJECT_NAME} PRIVATE nlohmann_json::nlohmann_json)
 
-  if(APPLE)
-    # We need to add the default path to the driver (libcuda.dylib) as an rpath,
-    # so that the static cuda runtime can find it at runtime.
-    set_property(TARGET ccdgpu_bin PROPERTY BUILD_RPATH ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+  # rational-cpp (requires GMP)
+  include(rational_cpp)
+  target_link_libraries(ipc_toolkit PUBLIC rational::rational)
+endif()
+
+# Extra warnings (link last for highest priority)
+include(scalable_ccd_warnings)
+target_link_libraries(scalable_ccd PRIVATE scalable_ccd::warnings)
+
+################################################################################
+# Compiler options
+################################################################################
+
+# Use C++17
+target_compile_features(scalable_ccd PUBLIC cxx_std_17)
+
+################################################################################
+# CUDA
+################################################################################
+
+if(SCALABLE_CCD_WITH_CUDA)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+  else()
+    message(FATAL_ERROR "No CUDA support found!")
   endif()
 
-  target_compile_options(
-    ccdgpu_bin PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+  # We need to explicitly state that we need all CUDA files in the particle
+  # library to be built with -dc as the member functions could be called by
+  # other libraries and executables.
+  set_target_properties(scalable_ccd PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+  if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24.0")
+    set(CMAKE_CUDA_ARCHITECTURES "native")
+  else()
+    include(FindCUDA/select_compute_arch)
+    CUDA_DETECT_INSTALLED_GPUS(CUDA_ARCH_LIST)
+    string(STRIP "${CUDA_ARCH_LIST}" CUDA_ARCH_LIST)
+    string(REPLACE " " ";" CUDA_ARCH_LIST "${CUDA_ARCH_LIST}")
+    string(REPLACE "." "" CUDA_ARCH_LIST "${CUDA_ARCH_LIST}")
+    set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
+  endif()
+  set_target_properties(scalable_ccd PROPERTIES CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
+
+  if(APPLE)
+    # We need to add the path to the driver (libcuda.dylib) as an rpath,
+    # so that the static cuda runtime can find it at runtime.
+    set_property(TARGET scalable_ccd
+                 PROPERTY
+                 BUILD_RPATH ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+  endif()
+
+  target_compile_options(scalable_ccd PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+    --generate-line-info
+    --use_fast_math
+    --relocatable-device-code=true
+
+    # --ptxas-options=-v
+    # --maxrregcount=7
+    -fPIC # https://stackoverflow.com/questions/5311515/gcc-fpic-option
+  >)
+
+  find_package(CUDAToolkit)
+  target_link_libraries(scalable_ccd PRIVATE CUDA::cudart)
+endif()
+
+################################################################################
+# Tests
+################################################################################
+
+# Enable unit testing at the root level
+# if(SCALABLE_CCD_TOPLEVEL_PROJECT AND SCALABLE_CCD_BUILD_TESTS)
+#   include(CTest)
+#   enable_testing()
+#   add_subdirectory(tests)
+# endif()
+
+################################################################################
+# Binary
+################################################################################
+if(SCALABLE_CCD_TOPLEVEL_PROJECT)
+  # executable
+  add_executable(scalable_ccd_bin "app/main.cpp")
+  set_target_properties(scalable_ccd_bin PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  set_property(TARGET scalable_ccd_bin PROPERTY CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
+
+  # Link libraries
+  target_link_libraries(scalable_ccd_bin PRIVATE scalable_ccd::scalable_ccd)
+
+  # JSON
+  include(json)
+  target_link_libraries(scalable_ccd_bin PRIVATE nlohmann_json::nlohmann_json)
+
+  if(APPLE)
+    # We need to add the path to the driver (libcuda.dylib) as an rpath,
+    # so that the static cuda runtime can find it at runtime.
+    set_property(TARGET scalable_ccd_bin
+                 PROPERTY
+                 BUILD_RPATH ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+  endif()
+
+  target_compile_options(scalable_ccd_bin PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
     --generate-line-info
     --use_fast_math
     --relocatable-device-code=true
@@ -141,6 +249,5 @@ if(CCDGPU_TOPLEVEL_PROJECT)
 
     # --maxrregcount=7
     -fPIC # https://stackoverflow.com/questions/5311515/gcc-fpic-option
-    >
-  )
+  >)
 endif()
