@@ -185,9 +185,9 @@ void addFaces(
 #else
 
     Eigen::MatrixXf lower_bound =
-        points.colwise().minCoeff().unaryExpr(&nextafter_down).array() - nextafter_up(inflation_radius);;
+        points.colwise().minCoeff().unaryExpr(&nextafter_down).array() - nextafter_up(inflation_radius);
     Eigen::MatrixXf upper_bound =
-        points.colwise().maxCoeff().unaryExpr(&nextafter_up).array() + nextafter_up(inflation_radius);;
+        points.colwise().maxCoeff().unaryExpr(&nextafter_up).array() + nextafter_up(inflation_radius);
 #endif
         auto& local_boxes = storages.local();
         local_boxes.emplace_back(

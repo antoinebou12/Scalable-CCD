@@ -5,11 +5,17 @@
 
 namespace scalable_ccd::stq {
 
-bool is_face(const std::array<int, 3>& vids);
+inline bool is_vertex(const std::array<int, 3>& vids)
+{
+    return vids[2] < 0 && vids[1] < 0;
+}
 
-bool is_edge(const std::array<int, 3>& vids);
+inline bool is_edge(const std::array<int, 3>& vids)
+{
+    return vids[2] < 0 && vids[1] >= 0;
+}
 
-bool is_vertex(const std::array<int, 3>& vids);
+inline bool is_face(const std::array<int, 3>& vids) { return vids[2] >= 0; }
 
 bool is_valid_pair(const std::array<int, 3>& a, const std::array<int, 3>& b);
 

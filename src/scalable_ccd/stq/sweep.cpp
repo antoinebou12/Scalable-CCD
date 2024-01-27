@@ -14,18 +14,6 @@ namespace scalable_ccd::stq {
 
 // typedef StructAlignment(32) std::array<_simd, 6> SimdObject;
 
-bool is_face(const std::array<int, 3>& vids) { return vids[2] >= 0; };
-
-bool is_edge(const std::array<int, 3>& vids)
-{
-    return vids[2] < 0 && vids[1] >= 0;
-};
-
-bool is_vertex(const std::array<int, 3>& vids)
-{
-    return vids[2] < 0 && vids[1] < 0;
-};
-
 bool is_valid_pair(const std::array<int, 3>& a, const std::array<int, 3>& b)
 {
     return (is_vertex(a) && is_face(b)) || (is_face(a) && is_vertex(b))
@@ -60,19 +48,21 @@ public:
     }
 };
 
-struct // sort_aabb_x
-{
-    bool operator()(Aabb a, Aabb b) const { return (a.min[0] < b.min[0]); }
-} sort_boxes;
+struct sort_boxes {
+    bool operator()(const Aabb& a, const Aabb& b) const
+    {
+        return (a.min[0] < b.min[0]);
+    }
+};
 
-// void sort_along_xaxis(std::vector<Aabb> &boxes, std::vector<int>
-// &box_indices,
-//                       int N) {
-//   // sort box indices by boxes minx val
-//   tbb::parallel_sort(box_indices.begin(), box_indices.end(),
-//                      sort_indices(boxes.data()));
-//   // sort boxes by minx val
-//   tbb::parallel_sort(boxes.begin(), boxes.end(), sort_boxes);
+// void sort_along_xaxis(
+//     std::vector<Aabb>& boxes, std::vector<int>& box_indices, int N)
+// {
+//     // sort box indices by boxes minx val
+//     tbb::parallel_sort(
+//         box_indices.begin(), box_indices.end(), sort_indices(boxes.data()));
+//     // sort boxes by minx val
+//     tbb::parallel_sort(boxes.begin(), boxes.end(), sort_boxes);
 // }
 
 void sort_along_xaxis(std::vector<Aabb>& boxes)
