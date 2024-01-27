@@ -37,9 +37,6 @@ int main(int argc, char** argv)
     std::vector<std::string> compare;
     app.add_option("-c,--compare", compare, "Compare with Mathematica");
 
-    int N = 0;
-    app.add_option("-n", N, "Number of boxes to test");
-
     int nbox = 0;
     app.add_option("-b", nbox, "Number of boxes to test");
 
@@ -53,15 +50,6 @@ int main(int argc, char** argv)
 
     std::vector<stq::Aabb> boxes;
     parse_mesh(file_t0, file_t1, boxes);
-
-    if (N <= 0) {
-        N = boxes.size();
-    }
-
-    int n = boxes.size();
-    std::vector<stq::Aabb> boxes_batching;
-    // boxes_batching.resize(n);
-    std::copy(boxes.begin(), boxes.end(), std::back_inserter(boxes_batching));
 
     // ------------------------------------------------------------------------
     // Run
@@ -78,11 +66,8 @@ int main(int argc, char** argv)
     Timer timer;
     timer.start();
 
-    sweep_cpu_single_batch(boxes_batching, n, N, overlaps);
-    while (overlaps.size()) {
-        count += overlaps.size();
-        sweep_cpu_single_batch(boxes_batching, n, N, overlaps);
-    }
+    int sort_axis = 0;
+    sort_and_sweep(boxes, sort_axis, overlaps);
 
     timer.stop();
     spdlog::trace("Elapsed time: {:.6f} ms", timer.getElapsedTimeInMilliSec());
@@ -91,7 +76,6 @@ int main(int argc, char** argv)
     // Compare
 
     spdlog::info("Overlaps: {}", overlaps.size());
-    spdlog::info("Final count: {}", count);
     for (const std::string& i : compare) {
         compare_mathematica(overlaps, i);
     }
