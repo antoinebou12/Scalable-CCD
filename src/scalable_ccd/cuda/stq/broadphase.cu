@@ -466,7 +466,6 @@ void runBroadPhase(
 
     finOverlaps.reserve(finOverlaps.size() + count);
     for (int i = 0; i < count; i++) {
-        assert(overlaps[i].x < overlaps[i].y);
         finOverlaps.emplace_back(overlaps[i].x, overlaps[i].y);
     }
 
