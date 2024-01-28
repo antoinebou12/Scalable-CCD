@@ -5,16 +5,10 @@ set(SOURCES
     broadphase.cuh
     collision.cu
     collision.cuh
-    io.cu
-    io.cuh
-    pca.cu
-    pca.cuh
     queue.cu
     queue.cuh
     sweep.cu
     sweep.cuh
-    timer.cuh
-    types.cuh
     util.cu
     util.cuh
 )

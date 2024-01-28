@@ -1,8 +1,10 @@
 #pragma once
 
-#include <scalable_ccd/timer.hpp>
+#include <scalable_ccd/utils/timer.hpp>
 
+#include <string>
 #include <stdio.h>
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 
@@ -14,7 +16,7 @@ using json = nlohmann::json;
 namespace scalable_ccd::cuda {
 
 // template <typename... Arguments>
-// void recordLaunch(char* tag, void(*f)(Arguments...), Arguments... args) {
+// void record(std::string tag, void(*f)(Arguments...), Arguments... args) {
 //       Timer timer;
 //       timer.start();
 //       f(args...);
@@ -27,7 +29,7 @@ namespace scalable_ccd::cuda {
 struct Record {
     Timer timer;
     cudaEvent_t start, stop;
-    char* tag;
+    std::string tag;
     json j_object;
     bool gpu_timer_on = false;
 
@@ -43,7 +45,7 @@ struct Record {
         Record();
     };
 
-    void Start(char* s, bool gpu = false)
+    void Start(const std::string& s, bool gpu = false)
     {
         tag = s;
         if (!gpu)
@@ -57,7 +59,7 @@ struct Record {
         }
     }
 
-    void Start(char* s, json& jtmp, bool gpu = false)
+    void Start(const std::string& s, json& jtmp, bool gpu = false)
     {
         j_object = jtmp;
         Start(s, gpu);
@@ -65,7 +67,7 @@ struct Record {
 
     void Stop()
     {
-        float elapsed; // was double
+        float elapsed = 0; // was double
         if (!gpu_timer_on) {
             timer.stop();
             elapsed += timer.getElapsedTimeInMilliSec();

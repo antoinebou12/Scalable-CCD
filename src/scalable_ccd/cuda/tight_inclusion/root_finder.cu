@@ -1,5 +1,5 @@
 #include <scalable_ccd/config.hpp>
-#include <scalable_ccd/cuda/limits.cuh>
+#include <scalable_ccd/cuda/utils/limits.cuh>
 #include <scalable_ccd/cuda/memory_handler.cuh>
 // #include <scalable_ccd/cuda/tight_inclusion/rational.hpp>
 #include <scalable_ccd/cuda/tight_inclusion/record.hpp>
@@ -946,8 +946,8 @@ void run_memory_pool_ccd(
     spdlog::trace("sizeof(Scalar) {:d}", sizeof(Scalar));
 
     int nbr_per_loop = nbr;
-    int start;
-    int end;
+    // int start = 0;
+    // int end = 0;
 
     spdlog::trace("Queue size t0: {:d}", nbr_per_loop);
     while (nbr_per_loop > 0) {

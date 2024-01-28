@@ -4,8 +4,8 @@
 #include <scalable_ccd/cuda/memory_handler.cuh>
 #include <scalable_ccd/cuda/stq/broadphase.cuh>
 #include <scalable_ccd/cuda/stq/util.cuh>
-#include <scalable_ccd/cuda/stq/io.cuh>
-#include <scalable_ccd/cuda/stq/pca.cuh>
+#include <scalable_ccd/cuda/stq/aabb.cuh>
+#include <scalable_ccd/utils/pca.hpp>
 
 #include <igl/write_triangle_mesh.h>
 
@@ -50,11 +50,11 @@ int main(int argc, char** argv)
 
     int nbox = 0;
     int parallel = 0;
-    bool evenworkload = false;
+    // bool evenworkload = false;
     int devcount = 1;
-    bool pairing = false;
-    bool sharedqueue_mgpu = false;
-    bool bigworkerqueue = false;
+    // bool pairing = false;
+    // bool sharedqueue_mgpu = false;
+    // bool bigworkerqueue = false;
     bool pca = false;
 
     int memlimit = 0;
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
         "vertices_t0 : {:d} x {:d}", static_cast<int>(vertices_t0.rows()),
         static_cast<int>(vertices_t0.cols()));
     if (pca) {
-        scalable_ccd::cuda::stq::nipalsPCA(vertices_t0, vertices_t1);
+        scalable_ccd::nipals_pca(vertices_t0, vertices_t1);
 
         std::string filet0Str(filet0);
         std::filesystem::path p(filet0Str);

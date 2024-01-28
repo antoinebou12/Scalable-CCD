@@ -28,4 +28,5 @@ void runBroadPhase(
     int& tidstart,
     int& devcount,
     const int memlimit = 0);
+
 } // namespace scalable_ccd::cuda::stq

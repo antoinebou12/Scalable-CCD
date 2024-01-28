@@ -131,7 +131,7 @@ include(spdlog)
 target_link_libraries(scalable_ccd PRIVATE spdlog::spdlog)
 
 # JSON
-target_link_libraries(scalable_ccd PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(scalable_ccd PUBLIC nlohmann_json::nlohmann_json)
 
 if(SCALABLE_CCD_TOI_PER_QUERY)
   # rational-cpp (requires GMP)
@@ -199,7 +199,7 @@ if(SCALABLE_CCD_WITH_CUDA)
   >)
 
   find_package(CUDAToolkit)
-  target_link_libraries(scalable_ccd PRIVATE CUDA::cudart)
+  target_link_libraries(scalable_ccd PUBLIC CUDA::cudart)
 endif()
 
 ################################################################################

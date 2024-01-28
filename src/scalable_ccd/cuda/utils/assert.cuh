@@ -9,8 +9,8 @@
 
 namespace scalable_ccd::cuda {
 
-inline void
-gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
+inline void gpuAssert(
+    cudaError_t code, const std::string& file, int line, bool abort = true)
 {
     if (code != cudaSuccess) {
         spdlog::error(

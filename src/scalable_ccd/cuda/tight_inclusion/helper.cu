@@ -8,7 +8,7 @@
 // #include <gputi/book.h>
 // #include <gputi/io.h>
 #include <scalable_ccd/cuda/tight_inclusion/root_finder.cuh>
-#include <scalable_ccd/cuda/stq/io.cuh>
+#include <scalable_ccd/cuda/stq/aabb.cuh>
 
 #include <scalable_ccd/cuda/tight_inclusion/record.hpp>
 #include <scalable_ccd/cuda/stq/broadphase.cuh>

@@ -7,44 +7,60 @@
 #include <cuda_runtime.h>
 
 #include <tbb/parallel_for.h>
+#include <tbb/global_control.h>
+#include <spdlog/spdlog.h>
 
 namespace scalable_ccd::cuda::stq {
 
-__host__ __device__ bool is_face(const Aabb& x) { return x.vertexIds.z >= 0; };
+#ifndef SCALABLE_CCD_WITH_DOUBLE
+namespace {
+    inline float nextafter_up(float x)
+    {
+        return nextafterf(x, x + std::numeric_limits<float>::max());
+    }
 
-__host__ __device__ bool is_face(const int3& vids) { return vids.z >= 0; };
+    inline float nextafter_down(float x)
+    {
+        return nextafterf(x, x - std::numeric_limits<float>::max());
+    }
+} // namespace
+#endif
+
+__host__ __device__ bool is_face(const Aabb& x) { return x.vertexIds.z >= 0; }
+
+__host__ __device__ bool is_face(const int3& vids) { return vids.z >= 0; }
 
 __host__ __device__ bool is_edge(const Aabb& x)
 {
     return x.vertexIds.z < 0 && x.vertexIds.y >= 0;
-};
+}
 
 __host__ __device__ bool is_edge(const int3& vids)
 {
     return vids.z < 0 && vids.y >= 0;
-};
+}
 
 __host__ __device__ bool is_vertex(const Aabb& x)
 {
     return x.vertexIds.z < 0 && x.vertexIds.y < 0;
-};
+}
 
 __host__ __device__ bool is_vertex(const int3& vids)
 {
     return vids.z < 0 && vids.y < 0;
-};
+}
 
 __host__ __device__ bool is_valid_pair(const Aabb& a, const Aabb& b)
 {
     return (is_vertex(a) && is_face(b)) || (is_face(a) && is_vertex(b))
         || (is_edge(a) && is_edge(b));
-};
+}
 
 __host__ __device__ bool is_valid_pair(const int3& a, const int3& b)
 {
     return (is_vertex(a) && is_face(b)) || (is_face(a) && is_vertex(b))
         || (is_edge(a) && is_edge(b));
-};
+}
 
 void merge_local_boxes(
     const tbb::enumerable_thread_specific<std::vector<Aabb>>& storages,
@@ -60,15 +76,6 @@ void merge_local_boxes(
         boxes.insert(boxes.end(), local_boxes.begin(), local_boxes.end());
     }
 }
-
-float nextafter_up(float x)
-{
-    return nextafterf(x, x + std::numeric_limits<float>::max());
-};
-float nextafter_down(float x)
-{
-    return nextafterf(x, x - std::numeric_limits<float>::max());
-};
 
 void addEdges(
     const Eigen::MatrixXd& vertices_t0,
@@ -195,6 +202,25 @@ void addFaces(
             upper_bound.data());
     });
     merge_local_boxes(storages, boxes);
-};
+}
+
+void constructBoxes(
+    const Eigen::MatrixXd& vertices_t0,
+    const Eigen::MatrixXd& vertices_t1,
+    const Eigen::MatrixXi& edges,
+    const Eigen::MatrixXi& faces,
+    std::vector<Aabb>& boxes,
+    int threads,
+    Scalar inflation_radius)
+{
+    if (threads <= 0)
+        threads = std::min(tbb::info::default_concurrency(), 64);
+    spdlog::trace("constructBoxes threads : {}", threads);
+    tbb::global_control thread_limiter(
+        tbb::global_control::max_allowed_parallelism, threads);
+    addVertices(vertices_t0, vertices_t1, inflation_radius, boxes);
+    addEdges(vertices_t0, vertices_t1, edges, inflation_radius, boxes);
+    addFaces(vertices_t0, vertices_t1, faces, inflation_radius, boxes);
+}
 
 } // namespace scalable_ccd::cuda::stq

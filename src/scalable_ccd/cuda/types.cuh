@@ -7,6 +7,8 @@
 
 namespace scalable_ccd::cuda {
 
+enum Dimension { x, y, z };
+
 class Singleinterval {
 public:
     __device__ Singleinterval() {};

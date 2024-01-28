@@ -1,13 +1,11 @@
 
-#include <scalable_ccd/cuda/stq/aabb.cuh>
-#include <scalable_ccd/cuda/stq/util.cuh>
+#include "util.cuh"
+
 #include <scalable_ccd/cuda/stq/queue.cuh>
 
 #include <spdlog/spdlog.h>
 
 namespace scalable_ccd::cuda::stq {
-
-// void setup(int devId, int &smemSize, int &threads, int &nboxes);
 
 void setup(int devId, int& smemSize, int& threads, int& nbox)
 {

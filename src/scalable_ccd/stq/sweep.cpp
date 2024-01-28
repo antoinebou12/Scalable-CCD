@@ -1,7 +1,8 @@
 #include "sweep.hpp"
 
+#include <scalable_ccd/utils/merge_local_overlaps.hpp>
+
 #include <tbb/blocked_range.h>
-#include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
 
@@ -65,26 +66,6 @@ namespace {
             return boxes[i].min[axis] < boxes[j].min[axis];
         }
     };
-
-    typedef tbb::enumerable_thread_specific<std::vector<std::pair<int, int>>>
-        ThreadSpecificOverlaps;
-
-    void merge_local_overlaps(
-        const ThreadSpecificOverlaps& storages,
-        std::vector<std::pair<int, int>>& overlaps)
-    {
-        overlaps.clear();
-        size_t num_overlaps = overlaps.size();
-        for (const auto& local_overlaps : storages) {
-            num_overlaps += local_overlaps.size();
-        }
-        // serial merge!
-        overlaps.reserve(num_overlaps);
-        for (const auto& local_overlaps : storages) {
-            overlaps.insert(
-                overlaps.end(), local_overlaps.begin(), local_overlaps.end());
-        }
-    }
 
     /// @brief Sweep the boxes along the given axis (without memory check).
     /// @param[in] boxes Boxes to sweep.

@@ -6,9 +6,10 @@
 #include <scalable_ccd/cuda/stq/collision.cuh>
 #include <scalable_ccd/cuda/stq/queue.cuh>
 #include <scalable_ccd/cuda/stq/sweep.cuh>
-#include <scalable_ccd/cuda/stq/timer.cuh>
 #include <scalable_ccd/cuda/stq/util.cuh>
-#include <scalable_ccd/cuda/stq/io.cuh>
+#include <scalable_ccd/cuda/stq/aabb.cuh>
+#include <scalable_ccd/cuda/utils/record.cuh>
+#include <scalable_ccd/utils/merge_local_overlaps.hpp>
 
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
@@ -82,9 +83,9 @@ void runBroadPhaseMultiGPU(
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-    cudaEvent_t starts[devices_count];
-    cudaEvent_t stops[devices_count];
-    float millisecondss[devices_count];
+    cudaEvent_t starts[devices_count] = {};
+    cudaEvent_t stops[devices_count] = {};
+    float millisecondss[devices_count] = {};
 
     tbb::parallel_for(0, devices_count, 1, [&](int& device_id) {
         auto& local_overlaps = storages.local();
@@ -291,10 +292,10 @@ void runBroadPhase(
     //   cudaMalloc((void **)&d_mean, sizeof(Scalar3));
     //   cudaMemset(d_mean, 0, sizeof(Scalar3));
 
-    //   // recordLaunch("splitBoxes", grid_dim_1d, threads, smemSize,
+    //   // record("splitBoxes", grid_dim_1d, threads, smemSize,
     //   splitBoxes,
     //   // d_boxes, d_sm, d_mini, N, d_mean);
-    //   recordLaunch("calc_mean", grid_dim_1d, threads, smemSize, calc_mean,
+    //   record("calc_mean", grid_dim_1d, threads, smemSize, calc_mean,
     //   d_boxes,
     //                d_mean, N);
 
@@ -309,7 +310,7 @@ void runBroadPhase(
     //   cudaMalloc((void **)&d_var, sizeof(Scalar3));
     //   cudaMemset(d_var, 0, sizeof(Scalar3));
     //   // calc_variance(boxes, d_var, N, d_mean);
-    //   recordLaunch("calc_variance", grid_dim_1d, threads, smemSize,
+    //   record("calc_variance", grid_dim_1d, threads, smemSize,
     //   calc_variance,
     //                d_boxes, d_var, N, d_mean);
     //   cudaDeviceSynchronize();
@@ -334,7 +335,7 @@ void runBroadPhase(
 
     spdlog::trace("Axis: {:s}", axis == x ? "x" : (axis == y ? "y" : "z"));
 
-    recordLaunch<Aabb*, Scalar2*, MiniBox*, int, Dimension>(
+    record<Aabb*, Scalar2*, MiniBox*, int, Dimension>(
         "splitBoxes", grid_dim_1d, threads, smemSize, splitBoxes, d_boxes, d_sm,
         d_mini, N, axis);
 
@@ -378,14 +379,13 @@ void runBroadPhase(
 
     spdlog::trace("Starting two stage_queue");
     spdlog::trace("Starting tid {:d}", tidstart);
-    // recordLaunch<Scalar2 *, const MiniBox *, int2 *, int, int *, int *,
+    // record<Scalar2 *, const MiniBox *, int2 *, int, int *, int *,
     //              MemoryHandler *>("runSTQ", grid_dim_1d, threads, runSTQ,
     //              d_sm,
     //                            d_mini, d_overlaps, N, d_count, d_start,
     //                            d_memory_handler);
-    // write recordLaunch for SAPVanilla
-    recordLaunch<
-        Scalar2*, const MiniBox*, int2*, int, int*, int*, MemoryHandler*>(
+    // write record for SAPVanilla
+    record<Scalar2*, const MiniBox*, int2*, int, int*, int*, MemoryHandler*>(
         "runSAPVanilla", grid_dim_1d, threads, runSAPVanilla, d_sm, d_mini,
         d_overlaps, N, d_count, d_start, d_memory_handler);
     gpuErrchk(cudaDeviceSynchronize());
@@ -421,12 +421,12 @@ void runBroadPhase(
             d_memory_handler, memory_handler, sizeof(MemoryHandler),
             cudaMemcpyHostToDevice);
 
-        // recordLaunch<Scalar2 *, const MiniBox *, int2 *, int, int *, int *,
+        // record<Scalar2 *, const MiniBox *, int2 *, int, int *, int *,
         //              MemoryHandler *>("runSTQ", grid_dim_1d, threads, runSTQ,
         //              d_sm,
         //                            d_mini, d_overlaps, N, d_count, d_start,
         //                            d_memory_handler);
-        recordLaunch<
+        record<
             Scalar2*, const MiniBox*, int2*, int, int*, int*, MemoryHandler*>(
             "runSAPVanilla", grid_dim_1d, threads, runSAPVanilla, d_sm, d_mini,
             d_overlaps, N, d_count, d_start, d_memory_handler);

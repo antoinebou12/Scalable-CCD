@@ -190,7 +190,8 @@ __global__ void runSTQ(
     MemoryHandler* mem)
 {
     // Initialize shared queue for threads to push collisions onto
-    __shared__ Queue queue;
+    // __shared__ Queue queue; // This results in a compiler warning
+    Queue queue;
     queue.heap_size = HEAP_SIZE;
     queue.start = 0;
     queue.end = 0;

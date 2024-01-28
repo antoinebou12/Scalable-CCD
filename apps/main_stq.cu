@@ -2,9 +2,9 @@
 #include "ground_truth.hpp"
 
 #include <scalable_ccd/scalar.hpp>
-#include <scalable_ccd/timer.hpp>
+#include <scalable_ccd/utils/timer.hpp>
 #include <scalable_ccd/cuda/memory_handler.cuh>
-#include <scalable_ccd/cuda/stq/io.cuh>
+#include <scalable_ccd/cuda/stq/aabb.cuh>
 #include <scalable_ccd/cuda/stq/util.cuh>
 #include <scalable_ccd/cuda/tight_inclusion/helper.cuh>
 #include <scalable_ccd/cuda/tight_inclusion/record.hpp>

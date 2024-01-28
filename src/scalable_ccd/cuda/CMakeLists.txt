@@ -1,7 +1,6 @@
 set(SOURCES
-  assert.cuh
-  limits.cuh
   memory_handler.cuh
+  scalar.cu
   scalar.cuh
   types.cuh
 )
@@ -15,3 +14,4 @@ target_sources(scalable_ccd PRIVATE ${SOURCES})
 
 add_subdirectory(stq)
 add_subdirectory(tight_inclusion)
+add_subdirectory(utils)

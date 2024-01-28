@@ -1,14 +1,14 @@
 #pragma once
 
-#include <algorithm>
-#include <vector>
+#include <scalable_ccd/cuda/scalar.cuh>
 
 #include <Eigen/Core>
 
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/info.h>
 
-#include <scalable_ccd/cuda/stq/types.cuh>
+#include <algorithm>
+#include <vector>
 
 namespace scalable_ccd::cuda::stq {
 
@@ -61,6 +61,15 @@ void addFaces(
     const Eigen::MatrixXi& faces,
     Scalar inflation_radius,
     std::vector<Aabb>& boxes);
+
+void constructBoxes(
+    const Eigen::MatrixXd& vertices_t0,
+    const Eigen::MatrixXd& vertices_t1,
+    const Eigen::MatrixXi& edges,
+    const Eigen::MatrixXi& faces,
+    std::vector<Aabb>& boxes,
+    int threads = -1,
+    Scalar inflation_radius = 0);
 
 // bool is_face = [](Aabb& x)
 // bool is_edge = [](Aabb& x){return x.vertexIds.z < 0 && x.vertexIds.y >= 0
@@ -130,9 +139,9 @@ public:
 __global__ class RankBox {
 public:
     Aabb* aabb;
-    ull rank_x;
-    ull rank_y;
-    ull rank_c;
+    uint64_t rank_x;
+    uint64_t rank_y;
+    uint64_t rank_c;
 };
 
 } // namespace scalable_ccd::cuda::stq

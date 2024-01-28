@@ -1,7 +1,7 @@
 #include "io.hpp"
 #include "ground_truth.hpp"
 
-#include <scalable_ccd/timer.hpp>
+#include <scalable_ccd/utils/timer.hpp>
 #include <scalable_ccd/stq/aabb.hpp>
 #include <scalable_ccd/stq/sweep.hpp>
 

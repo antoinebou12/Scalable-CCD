@@ -1,6 +1,6 @@
 #pragma once
 
-#include <scalable_ccd/timer.hpp>
+#include <scalable_ccd/utils/timer.hpp>
 #include <scalable_ccd/cuda/memory_handler.cuh>
 #include <scalable_ccd/cuda/tight_inclusion/type.hpp>
 #include <scalable_ccd/cuda/tight_inclusion/record.hpp>

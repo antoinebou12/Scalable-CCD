@@ -1,8 +1,8 @@
 #pragma once
 
 #include <scalable_ccd/config.hpp>
-#include <scalable_ccd/cuda/assert.cuh>
 #include <scalable_ccd/cuda/types.cuh>
+#include <scalable_ccd/cuda/utils/assert.cuh>
 
 namespace scalable_ccd::cuda {
 

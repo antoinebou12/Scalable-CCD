@@ -125,7 +125,7 @@ int main(int argc, char** argv)
         sizeof(cuda::binary_semaphore<cuda::thread_scope_block>));
     printf("sizeof(int2):  %i\n", sizeof(int2));
 
-    recordLaunch("run", grid, block, 8, run, d_in, d_out, N);
+    record("run", grid, block, 8, run, d_in, d_out, N);
     cudaDeviceSynchronize();
 
     vector<ll> out;

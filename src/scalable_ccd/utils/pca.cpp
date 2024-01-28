@@ -1,10 +1,8 @@
-#include <iostream>
-#include <Eigen/Dense>
-#include <scalable_ccd/cuda/stq/pca.cuh>
+#include "pca.hpp"
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd {
 
-void nipalsPCA(Eigen::MatrixXd& vertices_t0, Eigen::MatrixXd& vertices_t1)
+void nipals_pca(Eigen::MatrixXd& vertices_t0, Eigen::MatrixXd& vertices_t1)
 {
     int n_components = vertices_t0.cols();
 
@@ -47,4 +45,4 @@ void nipalsPCA(Eigen::MatrixXd& vertices_t0, Eigen::MatrixXd& vertices_t1)
     vertices_t1 = transformed_vertices.block(
         vertices_t0.rows(), 0, vertices_t1.rows(), n_components);
 }
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd
