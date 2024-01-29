@@ -14,7 +14,7 @@
 namespace scalable_ccd {
 
 namespace {
-    // typedef StructAlignment(32) std::array<_simd, 6> SimdObject;
+    inline int flip_id(const int id) { return -id - 1; }
 
     /// @brief Determine if two boxes are overlapping.
     /// @param a The first box.
@@ -72,6 +72,8 @@ namespace {
         const int axis;
 
     public:
+        SortBoxes(const int _axis) : axis(_axis) { }
+
         bool operator()(const AABB& a, const AABB& b) const
         {
             return a.min[axis] < b.min[axis];
@@ -124,7 +126,7 @@ namespace {
                             if constexpr (is_two_lists) {
                                 // Negative IDs are from the first list
                                 local_overlaps.emplace_back(
-                                    a.id < 0 ? (-a.id - 1) : (-b.id - 1),
+                                    a.id < 0 ? flip_id(a.id) : flip_id(b.id),
                                     a.id < 0 ? b.id : a.id);
                             } else {
                                 assert(a.id >= 0 && b.id >= 0);
@@ -246,7 +248,7 @@ void sort_and_sweep(
         if (i < boxesA.size() && j < boxesB.size()) {
             if (boxesA[i].min[sort_axis] < boxesB[j].min[sort_axis]) {
                 boxes[k] = boxesA[i];
-                boxes[k].id = -i - 1; // ∈ [-n, -1]
+                boxes[k].id = flip_id(boxesA[i].id); // ∈ [-n, -1]
                 i++;
             } else {
                 boxes[k] = boxesB[j];
@@ -254,7 +256,7 @@ void sort_and_sweep(
             }
         } else if (i < boxesA.size()) {
             boxes[k] = boxesA[i];
-            boxes[k].id = -i - 1;
+            boxes[k].id = flip_id(boxesA[i].id); // ∈ [-n, -1]
             i++;
         } else {
             assert(j < boxesB.size());
