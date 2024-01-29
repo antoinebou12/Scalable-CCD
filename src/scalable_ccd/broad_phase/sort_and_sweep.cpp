@@ -1,4 +1,4 @@
-#include "sweep.hpp"
+#include "sort_and_sweep.hpp"
 
 #include <scalable_ccd/utils/merge_local_overlaps.hpp>
 

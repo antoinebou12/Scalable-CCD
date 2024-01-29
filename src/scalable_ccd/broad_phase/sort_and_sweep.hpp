@@ -1,6 +1,6 @@
 #pragma once
 
-#include <scalable_ccd/stq/aabb.hpp>
+#include <scalable_ccd/broad_phase/aabb.hpp>
 #include <vector>
 
 namespace scalable_ccd {

@@ -2,8 +2,8 @@
 #include "ground_truth.hpp"
 
 #include <scalable_ccd/utils/timer.hpp>
-#include <scalable_ccd/stq/aabb.hpp>
-#include <scalable_ccd/stq/sweep.hpp>
+#include <scalable_ccd/broad_phase/aabb.hpp>
+#include <scalable_ccd/broad_phase/sort_and_sweep.hpp>
 
 #include <CLI/CLI.hpp>
 

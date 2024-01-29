@@ -10,7 +10,7 @@ target_sources(scalable_ccd PRIVATE ${SOURCES})
 # Subfolders
 ################################################################################
 
-add_subdirectory(stq)
+add_subdirectory(broad_phase)
 add_subdirectory(utils)
 if (SCALABLE_CCD_WITH_CUDA)
   add_subdirectory(cuda)

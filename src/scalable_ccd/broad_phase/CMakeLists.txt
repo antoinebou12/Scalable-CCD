@@ -1,8 +1,8 @@
 set(SOURCES
     aabb.cpp
     aabb.hpp
-    sweep.cpp
-    sweep.hpp
+    sort_and_sweep.cpp
+    sort_and_sweep.hpp
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" FILES ${SOURCES})
