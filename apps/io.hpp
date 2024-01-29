@@ -20,6 +20,8 @@ void parse_mesh(
 void parse_mesh(
     const std::string& file_t0,
     const std::string& file_t1,
-    std::vector<stq::Aabb>& boxes);
+    std::vector<AABB>& vertex_boxes,
+    std::vector<AABB>& edge_boxes,
+    std::vector<AABB>& face_boxes);
 
 } // namespace scalable_ccd

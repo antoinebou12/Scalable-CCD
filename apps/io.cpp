@@ -21,13 +21,17 @@ void parse_mesh(
 void parse_mesh(
     const std::string& file_t0,
     const std::string& file_t1,
-    std::vector<stq::Aabb>& boxes)
+    std::vector<AABB>& vertex_boxes,
+    std::vector<AABB>& edge_boxes,
+    std::vector<AABB>& face_boxes)
 {
     Eigen::MatrixXd V0, V1;
     Eigen::MatrixXi F;
     Eigen::MatrixXi E;
     parse_mesh(file_t0, file_t1, V0, V1, F, E);
-    constructBoxes(V0, V1, E, F, boxes);
+    build_vertex_boxes(V0, V1, vertex_boxes);
+    build_edge_boxes(vertex_boxes, E, edge_boxes);
+    build_edge_boxes(vertex_boxes, F, face_boxes);
 }
 
 } // namespace scalable_ccd

@@ -4,59 +4,49 @@
 
 #include <tbb/parallel_for.h>
 
-namespace scalable_ccd::stq {
+namespace scalable_ccd {
 
-void constructBoxes(
+#ifndef SCALABLE_CCD_WITH_DOUBLE
+namespace {
+    float nextafter_up(float x)
+    {
+        return nextafterf(x, x + std::numeric_limits<float>::max());
+    }
+
+    float nextafter_down(float x)
+    {
+        return nextafterf(x, x - std::numeric_limits<float>::max());
+    }
+} // namespace
+#endif
+
+void build_vertex_boxes(
     const Eigen::MatrixXd& vertices_t0,
     const Eigen::MatrixXd& vertices_t1,
-    const Eigen::MatrixXi& edges,
-    const Eigen::MatrixXi& faces,
-    std::vector<Aabb>& boxes,
-    double inflation_radius)
+    std::vector<AABB>& vertex_boxes,
+    const double inflation_radius)
 {
-    addVertices(vertices_t0, vertices_t1, boxes, inflation_radius);
-    addEdges(boxes, edges, boxes);
-    addFaces(boxes, faces, boxes);
-}
+    vertex_boxes.resize(vertices_t0.rows());
 
-float nextafter_up(float x)
-{
-    return nextafterf(x, x + std::numeric_limits<float>::max());
-}
+    tbb::parallel_for(
+        tbb::blocked_range<long>(0, vertices_t0.rows()),
+        [&](const tbb::blocked_range<long>& r) {
+            for (long i = r.begin(); i < r.end(); i++) {
+                vertex_boxes[i].id = i;
+                vertex_boxes[i].vertex_ids = { { i, -i - 1, -i - 1 } };
 
-float nextafter_down(float x)
-{
-    return nextafterf(x, x - std::numeric_limits<float>::max());
-}
-
-void addVertices(
-    const Eigen::MatrixXd& vertices_t0,
-    const Eigen::MatrixXd& vertices_t1,
-    std::vector<Aabb>& boxes,
-    double inflation_radius)
-{
-    size_t offset = boxes.size();
-    boxes.resize(offset + vertices_t0.rows());
-
-    tbb::parallel_for( //
-        tbb::blocked_range<int>(0, vertices_t0.rows()),
-        [&](const tbb::blocked_range<int>& r) {
-            for (int i = r.begin(); i < r.end(); i++) {
-                boxes[offset + i].id = offset + i;
-                boxes[offset + i].vertexIds = { { i, -i - 1, -i - 1 } };
-
-                ArrayMax3 vertex_t0 = vertices_t0.row(i).cast<Scalar>();
-                ArrayMax3 vertex_t1 = vertices_t1.row(i).cast<Scalar>();
+                const ArrayMax3 vertex_t0 = vertices_t0.row(i).cast<Scalar>();
+                const ArrayMax3 vertex_t1 = vertices_t1.row(i).cast<Scalar>();
 #ifdef SCALABLE_CCD_WITH_DOUBLE
-                boxes[offset + i].min =
+                vertex_boxes[i].min =
                     vertex_t0.min(vertex_t1) - inflation_radius;
-                boxes[offset + i].max =
+                vertex_boxes[i].max =
                     vertex_t0.max(vertex_t1) + inflation_radius;
 #else
-                boxes[offset + i].min =
+                vertex_boxes[i].min =
                     vertex_t0.min(vertex_t1).unaryExpr(&nextafter_down)
                     - nextafter_up(inflation_radius);
-                boxes[offset + i].max =
+                vertex_boxes[i].max =
                     vertex_t0.max(vertex_t1).unaryExpr(&nextafter_up)
                     + nextafter_up(inflation_radius);
 #endif
@@ -64,57 +54,53 @@ void addVertices(
         });
 }
 
-void addEdges(
-    const std::vector<Aabb>& vertex_boxes,
+void build_edge_boxes(
+    const std::vector<AABB>& vertex_boxes,
     const Eigen::MatrixXi& edges,
-    std::vector<Aabb>& boxes)
+    std::vector<AABB>& edge_boxes)
 {
-    size_t offset = boxes.size();
-    boxes.resize(offset + edges.rows());
+    edge_boxes.resize(edges.rows());
 
-    tbb::parallel_for( //
+    tbb::parallel_for(
         tbb::blocked_range<size_t>(0, edges.rows()),
         [&](const tbb::blocked_range<size_t>& r) {
             for (size_t i = r.begin(); i < r.end(); i++) {
-                boxes[offset + i].id = offset + i;
-                boxes[offset + i].vertexIds = { { edges(i, 0), edges(i, 1),
-                                                  -edges(i, 0) - 1 } };
+                edge_boxes[i].id = i;
+                edge_boxes[i].vertex_ids = { { edges(i, 0), edges(i, 1),
+                                               -edges(i, 0) - 1 } };
 
-                const Aabb& v0_box = vertex_boxes[edges(i, 0)];
-                const Aabb& v1_box = vertex_boxes[edges(i, 1)];
+                const AABB& v0_box = vertex_boxes[edges(i, 0)];
+                const AABB& v1_box = vertex_boxes[edges(i, 1)];
 
-                boxes[offset + i].min = v0_box.min.min(v1_box.min);
-                boxes[offset + i].max = v0_box.max.max(v1_box.max);
+                edge_boxes[i].min = v0_box.min.min(v1_box.min);
+                edge_boxes[i].max = v0_box.max.max(v1_box.max);
             }
         });
 }
 
-void addFaces(
-    const std::vector<Aabb>& vertex_boxes,
+void build_face_boxes(
+    const std::vector<AABB>& vertex_boxes,
     const Eigen::MatrixXi& faces,
-    std::vector<Aabb>& boxes)
+    std::vector<AABB>& face_boxes)
 {
-    size_t offset = boxes.size();
-    boxes.resize(offset + faces.rows());
+    face_boxes.resize(faces.rows());
 
-    tbb::parallel_for( //
+    tbb::parallel_for(
         tbb::blocked_range<size_t>(0, faces.rows()),
         [&](const tbb::blocked_range<size_t>& r) {
             for (size_t i = r.begin(); i < r.end(); i++) {
-                boxes[offset + i].id = offset + i;
-                boxes[offset + i].vertexIds = { { faces(i, 0), faces(i, 1),
-                                                  faces(i, 2) } };
+                face_boxes[i].id = i;
+                face_boxes[i].vertex_ids = { { faces(i, 0), faces(i, 1),
+                                               faces(i, 2) } };
 
-                const Aabb& v0_box = vertex_boxes[faces(i, 0)];
-                const Aabb& v1_box = vertex_boxes[faces(i, 1)];
-                const Aabb& v2_box = vertex_boxes[faces(i, 2)];
+                const AABB& v0_box = vertex_boxes[faces(i, 0)];
+                const AABB& v1_box = vertex_boxes[faces(i, 1)];
+                const AABB& v2_box = vertex_boxes[faces(i, 2)];
 
-                boxes[offset + i].min =
-                    v0_box.min.min(v1_box.min).min(v2_box.min);
-                boxes[offset + i].max =
-                    v0_box.max.max(v1_box.max).max(v2_box.max);
+                face_boxes[i].min = v0_box.min.min(v1_box.min).min(v2_box.min);
+                face_boxes[i].max = v0_box.max.max(v1_box.max).max(v2_box.max);
             }
         });
 }
 
-} // namespace scalable_ccd::stq
+} // namespace scalable_ccd

@@ -48,8 +48,8 @@ int main(int argc, char** argv)
     // ------------------------------------------------------------------------
     // Load meshes
 
-    std::vector<stq::Aabb> boxes;
-    parse_mesh(file_t0, file_t1, boxes);
+    std::vector<AABB> vertex_boxes, edge_boxes, face_boxes;
+    parse_mesh(file_t0, file_t1, vertex_boxes, edge_boxes, face_boxes);
 
     // ------------------------------------------------------------------------
     // Run
@@ -60,14 +60,16 @@ int main(int argc, char** argv)
         tbb::global_control::max_allowed_parallelism, CPU_THREADS);
     spdlog::trace("Running with {:d} threads", CPU_THREADS);
 
-    std::vector<std::pair<int, int>> overlaps;
-    std::size_t count = 0;
-
     Timer timer;
     timer.start();
 
     int sort_axis = 0;
-    sort_and_sweep(boxes, sort_axis, overlaps);
+    std::vector<std::pair<int, int>> fv_overlaps;
+    sort_and_sweep(face_boxes, vertex_boxes, sort_axis, fv_overlaps);
+
+    sort_axis = 1;
+    std::vector<std::pair<int, int>> ee_overlaps;
+    sort_and_sweep(edge_boxes, sort_axis, ee_overlaps);
 
     timer.stop();
     spdlog::trace("Elapsed time: {:.6f} ms", timer.getElapsedTimeInMilliSec());
@@ -75,9 +77,13 @@ int main(int argc, char** argv)
     // ------------------------------------------------------------------------
     // Compare
 
-    spdlog::info("Overlaps: {}", overlaps.size());
+    spdlog::info(
+        "FV Overlaps: {}; EE Overlaps: {}", fv_overlaps.size(),
+        ee_overlaps.size());
     for (const std::string& i : compare) {
-        compare_mathematica(overlaps, i);
+        // TODO: update this to use the new format
+        compare_mathematica(fv_overlaps, i);
+        compare_mathematica(ee_overlaps, i);
     }
 
     return 0;
