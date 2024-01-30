@@ -142,7 +142,7 @@ __global__ void runSAPVanilla(
     if (tid >= num_boxes || ntid >= num_boxes)
         return;
 
-    const Scalar& a = boxMinor[tid];
+    const Scalar2& a = boxMinor[tid];
     // Scalar b_min_x = tid + 1 < num_boxes
     //     ? __shfl_sync(0xffffffff, a.min.x, threadIdx.x + 1)
     //     : boxes[ntid].min.x;
