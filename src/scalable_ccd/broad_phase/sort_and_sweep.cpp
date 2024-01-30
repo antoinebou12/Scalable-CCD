@@ -1,6 +1,7 @@
 #include "sort_and_sweep.hpp"
 
 #include <scalable_ccd/utils/merge_local_overlaps.hpp>
+#include <scalable_ccd/utils/logger.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -8,8 +9,6 @@
 
 #include <algorithm> // std::sort
 #include <vector>    // std::vector
-
-#include <spdlog/spdlog.h>
 
 namespace scalable_ccd {
 
@@ -21,19 +20,9 @@ namespace {
     /// @param b The second box.
     /// @param skip_axis The axis to skip.
     /// @return True if the boxes are overlapping, false otherwise.
-    bool are_overlapping(const AABB& a, const AABB& b, const int skip_axis)
+    bool are_overlapping(const AABB& a, const AABB& b)
     {
-        assert(skip_axis >= 0 && skip_axis <= 2);
-        if (skip_axis == 0) {
-            return a.max[1] >= b.min[1] && a.min[1] <= b.max[1]
-                && a.max[2] >= b.min[2] && a.min[2] <= b.max[2];
-        } else if (skip_axis == 1) {
-            return a.max[0] >= b.min[0] && a.min[0] <= b.max[0]
-                && a.max[2] >= b.min[2] && a.min[2] <= b.max[2];
-        } else {
-            return a.max[0] >= b.min[0] && a.min[0] <= b.max[0]
-                && a.max[1] >= b.min[1] && a.min[1] <= b.max[1];
-        }
+        return (a.min <= b.max).all() && (b.min <= a.max).all();
     }
 
     /// @brief Determine if two elements share a vertex.
@@ -121,7 +110,7 @@ namespace {
                         }
 
                         if (is_valid_pair<is_two_lists>(a.id, b.id)
-                            && are_overlapping(a, b, sort_axis)
+                            && are_overlapping(a, b)
                             && !share_a_vertex(a.vertex_ids, b.vertex_ids)) {
                             if constexpr (is_two_lists) {
                                 // Negative IDs are from the first list
@@ -183,7 +172,7 @@ void sweep(
                 throw std::runtime_error(
                     "Unable to sweep boxes: out of memory!");
             } else {
-                spdlog::warn(
+                logger().warn(
                     "Out of memory, trying batch size: {:d}",
                     batch_end - batch_start);
             }
@@ -207,7 +196,7 @@ void sweep(
     if (variance[1] > variance[0]) {
         sort_axis = 1;
     }
-    if (variance[2] > variance[sort_axis]) {
+    if (variance.size() == 2 && variance[2] > variance[sort_axis]) {
         sort_axis = 2;
     }
 }

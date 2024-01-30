@@ -6,10 +6,9 @@
 #include <scalable_ccd/cuda/stq/util.cuh>
 #include <scalable_ccd/cuda/stq/aabb.cuh>
 #include <scalable_ccd/utils/pca.hpp>
+#include <scalable_ccd/utils/logger.hpp>
 
 #include <igl/write_triangle_mesh.h>
-
-#include <spdlog/spdlog.h>
 
 #include <fstream>
 #include <unistd.h>
@@ -26,7 +25,7 @@ int main(int argc, char** argv)
     using namespace scalable_ccd;
     using namespace scalable_ccd::cuda;
 
-    spdlog::set_level(static_cast<spdlog::level::level_enum>(0));
+    logger().set_level(spdlog::level::trace);
     std::vector<char*> compare;
 
     MemoryHandler* memhandle = new MemoryHandler();
@@ -90,9 +89,8 @@ int main(int argc, char** argv)
     }
 
     parse_mesh(filet0, filet1, vertices_t0, vertices_t1, faces, edges);
-    spdlog::trace(
-        "vertices_t0 : {:d} x {:d}", static_cast<int>(vertices_t0.rows()),
-        static_cast<int>(vertices_t0.cols()));
+    logger().trace(
+        "vertices_t0 : {:d} x {:d}", vertices_t0.rows(), vertices_t0.cols());
     if (pca) {
         scalable_ccd::nipals_pca(vertices_t0, vertices_t1);
 
@@ -121,7 +119,7 @@ int main(int argc, char** argv)
         runBroadPhaseMultiGPU(
             boxes.data(), N, nbox, overlaps, parallel, devcount);
 
-    spdlog::debug("Final CPU overlaps size : {:d}", overlaps.size());
+    logger().debug("Final CPU overlaps size: {:d}", overlaps.size());
 
     for (auto compFile : compare) {
         compare_mathematica(overlaps, compFile);

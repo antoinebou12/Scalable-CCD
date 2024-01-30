@@ -1,7 +1,8 @@
 set(SOURCES
   assert.cuh
   limits.cuh
-  record.cuh
+  profiler.cpp
+  profiler.hpp
   timer.cuh
 )
 

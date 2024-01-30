@@ -1,6 +1,7 @@
 #pragma once
 
-#include <vector>
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 namespace scalable_ccd::cuda {
 
@@ -9,38 +10,40 @@ public:
     Timer()
     {
         cudaEventCreate(&m_start);
-        cudaEventCreate(&m_end);
+        cudaEventCreate(&m_stop);
     }
 
     ~Timer()
     {
         cudaEventDestroy(m_start);
-        cudaEventDestroy(m_end);
+        cudaEventDestroy(m_stop);
     }
 
-    void tick(cudaStream_t streamid = 0) { cudaEventRecord(m_start, streamid); }
+    void start(cudaStream_t streamid = 0)
+    {
+        is_running = true;
+        cudaEventRecord(m_start, streamid);
+    }
 
-    void tock(cudaStream_t streamid = 0) { cudaEventRecord(m_end, streamid); }
+    void stop(cudaStream_t streamid = 0)
+    {
+        if (!is_running)
+            return;
+        cudaEventRecord(m_stop, streamid);
+        is_running = false;
+    }
 
-    float elapsed() const
+    double getElapsedTimeInMilliSec() const
     {
         float ms;
-        cudaEventSynchronize(m_end);
-        cudaEventElapsedTime(&ms, m_start, m_end);
+        cudaEventSynchronize(m_stop);
+        cudaEventElapsedTime(&ms, m_start, m_stop);
         return ms;
     }
 
-    void clear() { m_records.clear(); }
-
-    void record(std::string tag)
-    {
-        tock();
-        m_records.push_back(make_pair(tag, elapsed()));
-    }
-
 private:
-    cudaEvent_t m_start, m_end;
-    std::vector<std::pair<std::string, float>> m_records;
+    cudaEvent_t m_start, m_stop;
+    bool is_running = false;
 };
 
 } // namespace scalable_ccd::cuda

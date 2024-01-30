@@ -7,7 +7,7 @@
 
 namespace scalable_ccd::cuda {
 
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
 
 using Scalar2 = double2;
 using Scalar3 = double3;

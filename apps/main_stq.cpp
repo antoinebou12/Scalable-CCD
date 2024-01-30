@@ -1,9 +1,10 @@
 #include "io.hpp"
 #include "ground_truth.hpp"
 
-#include <scalable_ccd/utils/timer.hpp>
 #include <scalable_ccd/broad_phase/aabb.hpp>
 #include <scalable_ccd/broad_phase/sort_and_sweep.hpp>
+#include <scalable_ccd/utils/timer.hpp>
+#include <scalable_ccd/utils/logger.hpp>
 
 #include <CLI/CLI.hpp>
 
@@ -12,8 +13,6 @@ using json = nlohmann::json;
 
 #include <tbb/global_control.h>
 #include <tbb/info.h>
-
-#include <spdlog/spdlog.h>
 
 #include <set>
 #include <vector>
@@ -24,7 +23,7 @@ int main(int argc, char** argv)
 {
     using namespace scalable_ccd;
 
-    spdlog::set_level(spdlog::level::trace);
+    logger().set_level(spdlog::level::trace);
 
     CLI::App app("STQ CPU");
 
@@ -58,7 +57,7 @@ int main(int argc, char** argv)
         std::min(tbb::info::default_concurrency(), 64);
     tbb::global_control thread_limiter(
         tbb::global_control::max_allowed_parallelism, CPU_THREADS);
-    spdlog::trace("Running with {:d} threads", CPU_THREADS);
+    logger().trace("Running with {:d} threads", CPU_THREADS);
 
     Timer timer;
     timer.start();
@@ -72,12 +71,12 @@ int main(int argc, char** argv)
     sort_and_sweep(edge_boxes, sort_axis, ee_overlaps);
 
     timer.stop();
-    spdlog::trace("Elapsed time: {:.6f} ms", timer.getElapsedTimeInMilliSec());
+    logger().trace("Elapsed time: {:.6f} ms", timer.getElapsedTimeInMilliSec());
 
     // ------------------------------------------------------------------------
     // Compare
 
-    spdlog::info(
+    logger().info(
         "FV Overlaps: {}; EE Overlaps: {}", fv_overlaps.size(),
         ee_overlaps.size());
     for (const std::string& i : compare) {

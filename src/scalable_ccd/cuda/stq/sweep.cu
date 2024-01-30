@@ -3,8 +3,7 @@
 // #include <scalable_ccd/cuda/stq/aabb.cuh>
 #include <scalable_ccd/cuda/stq/queue.cuh>
 #include <scalable_ccd/cuda/stq/sweep.cuh>
-
-#include <spdlog/spdlog.h>
+#include <scalable_ccd/utils/logger.hpp>
 
 namespace scalable_ccd::cuda::stq {
 
@@ -12,7 +11,7 @@ __global__ void retrieve_collision_pairs(
     const Aabb* const boxes,
     int* count,
     int2* overlaps,
-    int N,
+    int num_boxes,
     int guess,
     int nbox,
     int start,
@@ -22,7 +21,7 @@ __global__ void retrieve_collision_pairs(
     int tid = start + threadIdx.x + blockIdx.x * blockDim.x;
     int ltid = threadIdx.x;
 
-    if (tid >= N || tid >= end)
+    if (tid >= num_boxes || tid >= end)
         return;
     s_objects[ltid] = boxes[tid];
 
@@ -34,7 +33,7 @@ __global__ void retrieve_collision_pairs(
     int ntid = t + 1;
     int nltid = l + 1;
 
-    if (ntid >= N)
+    if (ntid >= num_boxes)
         return;
 
     const Aabb& a = s_objects[l];
@@ -48,7 +47,7 @@ __global__ void retrieve_collision_pairs(
 
         ntid++;
         nltid++;
-        if (ntid >= N)
+        if (ntid >= num_boxes)
             return;
         b = nltid < blockDim.x ? s_objects[nltid] : boxes[ntid];
     }
@@ -56,50 +55,54 @@ __global__ void retrieve_collision_pairs(
         printf("final count for box 0: %i\n", i);
 }
 
-__global__ void calc_mean(Aabb* boxes, Scalar3* mean, int N)
+__global__ void
+calc_mean(const Aabb* const boxes, const int num_boxes, Scalar3* mean)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (tid >= N)
+    if (tid >= num_boxes)
         return;
 
     // add to mean
 
-    Scalar3 mx = __fdividef((boxes[tid].min + boxes[tid].max), 2 * N);
+    // min + max / 2 / num_boxes
+    const Scalar3 mx =
+        __fdividef(boxes[tid].min + boxes[tid].max, 2 * num_boxes);
     atomicAdd(&mean[0].x, mx.x);
     atomicAdd(&mean[0].y, mx.y);
     atomicAdd(&mean[0].z, mx.z);
 }
 
-__global__ void calc_variance(Aabb* boxes, Scalar3* var, int N, Scalar3* mean)
+__global__ void calc_variance(
+    const Aabb* const boxes,
+    const int num_boxes,
+    const Scalar3* const mean,
+    Scalar3* var)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    if (tid >= N)
+    if (tid >= num_boxes)
         return;
 
-    Scalar3 fx = __powf(abs(boxes[tid].min - mean[0]), 2.0)
+    // |min - mean|² + |max - mean|²
+    const Scalar3 fx = __powf(abs(boxes[tid].min - mean[0]), 2.0)
         + __powf(abs(boxes[tid].max - mean[0]), 2.0);
-    // if (tid == 0) spdlog::trace("{:.6f} {:.6f} {:.6f}", fx.x, fx.y, fx.z);
     atomicAdd(&var[0].x, fx.x);
     atomicAdd(&var[0].y, fx.y);
     atomicAdd(&var[0].z, fx.z);
 }
-/**
- * @brief Splits each box into 2 different objects to improve performance
- *
- * @param boxes Boxes to be rearranged
- * @param sortedmin Contains the sorted min and max values of the non-major axes
- * @param mini Contains the vertex information of the boxes
- * @param N Number of boxes
- * @param axis Major axis
- */
+
 __global__ void splitBoxes(
-    Aabb* boxes, Scalar2* sortedmin, MiniBox* mini, int N, Dimension axis)
+    const Aabb* const boxes,
+    Scalar2* sortedmin,
+    MiniBox* mini,
+    const int num_boxes,
+    const Dimension axis)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (tid >= N)
+    if (tid >= num_boxes)
         return;
+
     Scalar* min;
     Scalar* max;
 
@@ -108,7 +111,6 @@ __global__ void splitBoxes(
         min = (Scalar[2]) { boxes[tid].min.y, boxes[tid].min.z };
         max = (Scalar[2]) { boxes[tid].max.y, boxes[tid].max.z };
     } else if (axis == y) {
-
         sortedmin[tid] = make_Scalar2(boxes[tid].min.y, boxes[tid].max.y);
         min = (Scalar[2]) { boxes[tid].min.x, boxes[tid].min.z };
         max = (Scalar[2]) { boxes[tid].max.x, boxes[tid].max.z };
@@ -122,75 +124,65 @@ __global__ void splitBoxes(
 }
 
 __global__ void runSAPVanilla(
-    Scalar2* boxMinor,
+    const Scalar2* const boxMinor,
     const MiniBox* const boxVerts,
+    const int num_boxes,
     int2* overlaps,
-    int N,
     int* count,
     int* start,
-    MemoryHandler* mem)
+    MemoryHandler* memory_handler)
 {
-
     int tid = threadIdx.x + blockIdx.x * blockDim.x + *start;
     int ntid = tid + 1;
     int delta = 1;
-    if (tid >= mem->MAX_OVERLAP_CUTOFF + *start)
+
+    if (tid >= memory_handler->MAX_OVERLAP_CUTOFF + *start)
         return;
-    if (tid < N && ntid < N) {
-        Scalar2 a = boxMinor[tid];
-        // Scalar b_min_x = tid + 1 < N ? __shfl_sync(0xffffffff, a.min.x,
-        // threadIdx.x + 1)
-        //                 : boxes[ntid].min.x;
-        // Scalar2 b = boxMinor[ntid];
-        Scalar b_x;
-        b_x = __shfl_down_sync(0xffffffff, a.x, delta);
-        b_x = boxMinor[ntid].x;
 
-        MiniBox amini = boxVerts[tid];
-        MiniBox bmini = boxVerts[ntid];
+    if (tid >= num_boxes || ntid >= num_boxes)
+        return;
 
-        while (a.y >= b_x && ntid < N) {
-            if (does_collide(amini, bmini)
-                && is_valid_pair(amini.vertexIds, bmini.vertexIds)
-                && !covertex(amini.vertexIds, bmini.vertexIds)) {
-                add_overlap(amini.id, bmini.id, count, overlaps, start, mem);
-            }
+    const Scalar& a = boxMinor[tid];
+    // Scalar b_min_x = tid + 1 < num_boxes
+    //     ? __shfl_sync(0xffffffff, a.min.x, threadIdx.x + 1)
+    //     : boxes[ntid].min.x;
+    // Scalar2 b = boxMinor[ntid];
+    Scalar b_x;
+    b_x = __shfl_down_sync(0xffffffff, a.x, delta);
+    b_x = boxMinor[ntid].x;
 
-            ntid++;
-            delta++;
-            if (ntid < N) {
-                b_x = __shfl_down_sync(0xffffffff, a.x, delta);
-                b_x = boxMinor[ntid].x;
-                bmini = boxVerts[ntid];
-            }
+    MiniBox amini = boxVerts[tid];
+    MiniBox bmini = boxVerts[ntid];
+
+    while (a.y >= b_x && ntid < num_boxes) {
+        if (does_collide(amini, bmini)
+            && is_valid_pair(amini.vertexIds, bmini.vertexIds)
+            && !covertex(amini.vertexIds, bmini.vertexIds)) {
+            add_overlap(
+                amini.id, bmini.id, count, overlaps, start, memory_handler);
+        }
+
+        ntid++;
+        delta++;
+        if (ntid < num_boxes) {
+            b_x = __shfl_down_sync(0xffffffff, a.x, delta);
+            b_x = boxMinor[ntid].x;
+            bmini = boxVerts[ntid];
         }
     }
 }
 
-/**
- * @brief Runs the sweep and prune tiniest queue (STQ) algorithm
- *
- * @param sortedMajorAxis Contains the sorted min and max values of the major
- * axis
- * @param boxVerts Contains the sorted min and max values of the non-major
- * axes and vertex information to check for simplex matching and covertices
- * @param overlaps Final output array of colliding box pairs
- * @param N Number of boxes
- * @param count Number of collisions
- * @param start Start index of the thread
- * @param mem Memory handler
- */
 __global__ void runSTQ(
-    Scalar2* sortedMajorAxis,
+    const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
+    const int num_boxes,
     int2* overlaps,
-    int N,
     int* count,
     int* start,
-    MemoryHandler* mem)
+    MemoryHandler* memory_handler)
 {
     // Initialize shared queue for threads to push collisions onto
-    // __shared__ Queue queue; // This results in a compiler warning
+    // __shared__ Queue queue; // WARNING: This results in a compiler warning
     Queue queue;
     queue.heap_size = HEAP_SIZE;
     queue.start = 0;
@@ -198,12 +190,12 @@ __global__ void runSTQ(
 
     int tid = threadIdx.x + blockIdx.x * blockDim.x + *start;
 
-    if (tid >= N || tid + 1 >= N)
+    if (tid >= num_boxes || tid + 1 >= num_boxes)
         return;
 
     // If the number of boxes is to large for gpu memory, split the workload and
     // start where left off
-    if (tid >= mem->MAX_OVERLAP_CUTOFF + *start)
+    if (tid >= memory_handler->MAX_OVERLAP_CUTOFF + *start)
         return;
 
     Scalar amax = sortedMajorAxis[tid].y;
@@ -231,11 +223,11 @@ __global__ void runSTQ(
         // and not sharing same vertex
         if (does_collide(ax, bx) && is_valid_pair(ax.vertexIds, bx.vertexIds)
             && !covertex(ax.vertexIds, bx.vertexIds)) {
-            add_overlap(ax.id, bx.id, count, overlaps, start, mem);
+            add_overlap(ax.id, bx.id, count, overlaps, start, memory_handler);
         }
 
         // Repeat major axis check and push to queue if they collide
-        if (res.y + 1 >= N)
+        if (res.y + 1 >= num_boxes)
             return;
         amax = sortedMajorAxis[res.x].y;
         bmin = sortedMajorAxis[res.y + 1].x;

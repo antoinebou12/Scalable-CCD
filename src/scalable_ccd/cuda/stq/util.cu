@@ -2,48 +2,100 @@
 #include "util.cuh"
 
 #include <scalable_ccd/cuda/stq/queue.cuh>
-
-#include <spdlog/spdlog.h>
+#include <scalable_ccd/utils/logger.hpp>
 
 namespace scalable_ccd::cuda::stq {
 
-void setup(int devId, int& smemSize, int& threads, int& nbox)
+void setup(
+    int device_id, int& shared_memory_size, int& threads, int& boxes_per_thread)
 {
-    int maxSmem;
-    cudaDeviceGetAttribute(&maxSmem, cudaDevAttrMaxSharedMemoryPerBlock, devId);
-    spdlog::trace("Max shared Memory per Block: {:d} B", maxSmem);
+    int max_shared_memory;
+    cudaDeviceGetAttribute(
+        &max_shared_memory, cudaDevAttrMaxSharedMemoryPerBlock, device_id);
+    logger().trace(
+        "Max shared memory per block: {:g} KB",
+        max_shared_memory / double(1 << 10));
 
-    int maxThreads;
-    cudaDeviceGetAttribute(&maxThreads, cudaDevAttrMaxThreadsPerBlock, devId);
-    spdlog::trace("Max threads per Block: {:d} thrds", maxThreads);
+    int max_threads;
+    cudaDeviceGetAttribute(
+        &max_threads, cudaDevAttrMaxThreadsPerBlock, device_id);
+    logger().trace("Max threads per block: {:d} threads", max_threads);
 
-    nbox =
-        nbox ? nbox : std::max((int)(maxSmem / sizeof(Aabb)) / maxThreads, 1);
-    spdlog::trace("Boxes per Thread: {:d}", nbox);
+    if (!boxes_per_thread) {
+        boxes_per_thread =
+            std::max(max_shared_memory / sizeof(Aabb) / max_threads, 1ul);
+    }
+    logger().trace("Boxes per thread: {:d}", boxes_per_thread);
 
     // divide threads by an arbitrary number as long as its reasonable >64
     if (!threads) {
         cudaDeviceGetAttribute(
-            &threads, cudaDevAttrMaxThreadsPerMultiProcessor, devId);
+            &threads, cudaDevAttrMaxThreadsPerMultiProcessor, device_id);
 
-        spdlog::trace("Max threads per Multiprocessor: {:d} thrds", threads);
+        logger().trace("Max threads per multiprocessor: {:d} threads", threads);
     }
-    smemSize = HEAP_SIZE * sizeof(int2); // nbox * threads * sizeof(Aabb);
+    shared_memory_size =
+        HEAP_SIZE * sizeof(int2); // boxes_per_thread * threads * sizeof(Aabb);
 
-    if (smemSize > maxSmem) {
-        spdlog::error("Shared memory size exceeds max shared memory per block");
-        spdlog::error("Max shared memory per block: {:d} B", maxSmem);
-        spdlog::error("Shared memory size: {:d} B", smemSize);
-        exit(1);
+    if (shared_memory_size > max_shared_memory) {
+        logger().error(
+            "Shared memory size exceeds max shared memory per block!");
+        logger().error(
+            "Max shared memory per block: {:d} B", max_shared_memory);
+        logger().error("Shared memory size: {:d} B", shared_memory_size);
+        throw std::runtime_error(
+            "Shared memory size exceeds max shared memory per block");
     }
-    // while (smemSize > maxSmem || threads > maxThreads) {
+    // while (shared_memory_size > max_shared_memory || threads > max_threads) {
     //   // threads--;
-    //   // smemSize = nbox * threads * sizeof(Aabb);
-    //   smemSize /= 2;
+    //   // shared_memory_size = boxes_per_thread * threads * sizeof(Aabb);
+    //   shared_memory_size /= 2;
     // }
-    spdlog::trace("Actual threads per Block: {:d} thrds", threads);
-    spdlog::trace("Shared mem alloc: {:d} B", smemSize);
-    return;
+    logger().trace("Actual threads per block: {:d} threads", threads);
+    logger().trace("Shared memory allocated: {:d} B", shared_memory_size);
+}
+
+template <typename... Arguments>
+void dispatch(
+    const std::string& tag,
+    int gs,
+    int bs,
+    size_t mem,
+    void (*f)(Arguments...),
+    Arguments... args)
+{
+    if (!mem) {
+        f<<<gs, bs>>>(args...);
+    } else {
+        f<<<gs, bs, mem>>>(args...);
+    }
+
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        logger().trace(
+            "Kernel launch failure {:s}\nTrying device-kernel launch",
+            cudaGetErrorString(error));
+
+        f(args...);
+
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            std::runtime_error(fmt::format(
+                "Device-kernel launch failure {:s}", cudaGetErrorString(err)));
+        }
+    }
+}
+
+template <typename... Arguments>
+void dispatch(
+    const std::string& tag,
+    int gs,
+    int bs,
+    void (*f)(Arguments...),
+    Arguments... args)
+{
+    size_t mem = 0;
+    dispatch(tag, gs, bs, mem, f, args...);
 }
 
 } // namespace scalable_ccd::cuda::stq

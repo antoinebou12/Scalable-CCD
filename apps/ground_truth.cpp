@@ -1,9 +1,9 @@
 #include "ground_truth.hpp"
 
+#include <scalable_ccd/utils/logger.hpp>
+
 #include <set>
 #include <fstream>
-
-#include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
@@ -40,10 +40,10 @@ void compare_mathematica(
     // Get from file
     std::ifstream in(json_path);
     if (in.fail()) {
-        spdlog::trace("{:s} does not exist", json_path);
+        logger().trace("{:s} does not exist", json_path);
         return;
     } else {
-        spdlog::trace("Comparing mathematica file {:s}", json_path);
+        logger().trace("Comparing mathematica file {:s}", json_path);
     }
 
     json j_vec = json::parse(in);
@@ -68,7 +68,7 @@ void compare_mathematica(
         algo_broad_phase.end(), algo_true_positives.begin());
     algo_true_positives.resize(it - algo_true_positives.begin());
 
-    spdlog::trace(
+    logger().trace(
         "Contains {:d}/{:d} TP", algo_true_positives.size(),
         true_positives.size());
     return;

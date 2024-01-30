@@ -6,7 +6,7 @@
 
 namespace scalable_ccd {
 
-#ifndef SCALABLE_CCD_WITH_DOUBLE
+#ifndef SCALABLE_CCD_USE_DOUBLE
 namespace {
     float nextafter_up(float x)
     {
@@ -37,7 +37,7 @@ void build_vertex_boxes(
 
                 const ArrayMax3 vertex_t0 = vertices_t0.row(i).cast<Scalar>();
                 const ArrayMax3 vertex_t1 = vertices_t1.row(i).cast<Scalar>();
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
                 vertex_boxes[i].min =
                     vertex_t0.min(vertex_t1) - inflation_radius;
                 vertex_boxes[i].max =

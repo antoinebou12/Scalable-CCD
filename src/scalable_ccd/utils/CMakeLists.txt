@@ -1,4 +1,6 @@
 set(SOURCES
+  logger.cpp
+  logger.hpp
   merge_local_overlaps.cpp
   merge_local_overlaps.hpp
   pca.cpp

@@ -2,14 +2,13 @@
 #include "ground_truth.hpp"
 
 #include <scalable_ccd/scalar.hpp>
-#include <scalable_ccd/utils/timer.hpp>
 #include <scalable_ccd/cuda/memory_handler.cuh>
 #include <scalable_ccd/cuda/stq/aabb.cuh>
 #include <scalable_ccd/cuda/stq/util.cuh>
 #include <scalable_ccd/cuda/tight_inclusion/helper.cuh>
-#include <scalable_ccd/cuda/tight_inclusion/record.hpp>
-
-#include <spdlog/spdlog.h>
+#include <scalable_ccd/cuda/utils/profiler.hpp>
+#include <scalable_ccd/utils/timer.hpp>
+#include <scalable_ccd/utils/logger.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -26,12 +25,11 @@ int main(int argc, char** argv)
     using namespace scalable_ccd;
     using namespace scalable_ccd::cuda;
 
-    spdlog::set_level(static_cast<spdlog::level::level_enum>(2));
+    logger().set_level(spdlog::level::trace);
 
     MemoryHandler* memhandle = new MemoryHandler();
 
     std::vector<char*> compare;
-    Record r;
 
     char* filet0;
     char* filet1;
@@ -48,14 +46,15 @@ int main(int argc, char** argv)
     Eigen::MatrixXi faces;
     Eigen::MatrixXi edges;
 
-    r.Start("parse_mesh");
-    parse_mesh(filet0, filet1, vertices_t0, vertices_t1, faces, edges);
-    r.Stop();
+    {
+        SCALABLE_CCD_CPU_PROFILE_POINT("parse_mesh");
+        parse_mesh(filet0, filet1, vertices_t0, vertices_t1, faces, edges);
+    }
 
-    json j;
-    r.Start("constructBoxes", j);
-    constructBoxes(vertices_t0, vertices_t1, edges, faces, boxes);
-    r.Stop();
+    {
+        SCALABLE_CCD_CPU_PROFILE_POINT("constructBoxes");
+        constructBoxes(vertices_t0, vertices_t1, edges, faces, boxes);
+    }
     int N = boxes.size();
     int nbox = 0;
     int parallel = 64;
@@ -122,4 +121,6 @@ int main(int argc, char** argv)
         compare_mathematica(overlaps, result_list, i);
     }
     std::cout << std::endl;
+
+    profiler().print();
 }

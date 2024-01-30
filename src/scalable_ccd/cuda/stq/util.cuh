@@ -2,8 +2,6 @@
 
 #include <scalable_ccd/cuda/stq/aabb.cuh>
 
-#include <spdlog/spdlog.h>
-
 namespace scalable_ccd::cuda::stq {
 
 struct sort_aabb_x {
@@ -23,6 +21,10 @@ struct sort_aabb_x {
     }
 };
 
-void setup(int devId, int& smemSize, int& threads, int& nbox);
+void setup(
+    int device_id,
+    int& shared_memory_size,
+    int& threads,
+    int& boxes_per_thread);
 
 } // namespace scalable_ccd::cuda::stq

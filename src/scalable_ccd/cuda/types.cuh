@@ -9,17 +9,16 @@ namespace scalable_ccd::cuda {
 
 enum Dimension { x, y, z };
 
-class Singleinterval {
-public:
-    __device__ Singleinterval() {};
+struct Interval {
+    __device__ Interval() {};
 
-    __device__ Singleinterval(const Scalar& f, const Scalar& s)
+    __device__ Interval(const Scalar& f, const Scalar& s)
     {
         first = f;
         second = s;
     }
 
-    __device__ Singleinterval& operator=(const Singleinterval& x)
+    __device__ Interval& operator=(const Interval& x)
     {
         if (this == &x)
             return *this;
@@ -30,6 +29,14 @@ public:
 
     Scalar first;
     Scalar second;
+};
+
+struct IntervalPair {
+    __device__ IntervalPair() = default;
+    __device__ IntervalPair(const Interval& itv);
+
+    Interval first;
+    Interval second;
 };
 
 class MP_unit {
@@ -59,7 +66,7 @@ public:
         return *this;
     }
 
-    Singleinterval itv[3];
+    Interval itv[3];
     int query_id;
     // Scalar true_tol;
     // bool box_in;
@@ -67,7 +74,7 @@ public:
 
 class CCDData {
 public:
-    __host__ __device__ CCDData() { }
+    __host__ __device__ CCDData() = default;
 
     // CCDData(const std::array<std::array<Scalar,3>,8>&input);
 
@@ -111,22 +118,58 @@ public:
 };
 
 // the initialized error input, solve tolerance, time interval upper bound, etc.
-class CCDConfig {
-public:
-    // Scalar err_in[3]; // the input error bound calculate from the
-    // AABB of the whole mesh
-    Scalar co_domain_tolerance; // tolerance of the co-domain
-    // Scalar max_t;               // the upper bound of the time interval
+struct CCDConfig {
+    /// @brief the input error bound calculate from the AABB of the whole mesh.
+    // Scalar err_in[3];
+
+    /// @brief Tolerance of the co-domain.
+    Scalar co_domain_tolerance;
+
+    /// @brief The upper bound of the time interval.
+    // Scalar max_t;
+
+    /// @brief
     unsigned int mp_start;
+
+    /// @brief
     unsigned int mp_end;
+
+    /// @brief
     int mp_remaining;
+
+    /// @brief
     long unit_size;
+
+    /// @brief Time of impact.
     Scalar toi;
+
+    /// @brief
     ::cuda::binary_semaphore<::cuda::thread_scope_device> mutex;
+
+    /// @brief If true, use a minimum separation.
     bool use_ms;
+
+    /// @brief If true, allow for zero time of impact.
     bool allow_zero_toi;
+
+    /// @brief The maximum number of iterations.
     int max_iter;
+
+    /// @brief Error overflow flag.
     int overflow_flag;
+};
+
+// this is to calculate the vertices of the inclusion function
+struct BoxPrimatives {
+    bool b[3];
+
+    int dim;
+
+    Scalar t;
+    Scalar u;
+    Scalar v;
+
+    __device__ void calculate_tuv(const MP_unit& unit);
 };
 
 } // namespace scalable_ccd::cuda

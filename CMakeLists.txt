@@ -61,10 +61,11 @@ project(ScalableCCD
         LANGUAGES CXX
         VERSION "0.1.0")
 
-option(SCALABLE_CCD_WITH_CUDA         "Enable CUDA CCD"                         OFF)
-OPTION(SCALABLE_CCD_WITH_DOUBLE       "Use double precision calculation"         ON)
-OPTION(SCALABLE_CCD_TOI_PER_QUERY     "Output time of impact per query in JSON" OFF)
-option(SCALABLE_CCD_KEEP_CPU_OVERLAPS "Keep CPU overlaps after CUDA method"     OFF)
+option(SCALABLE_CCD_WITH_CUDA     "Enable CUDA CCD"                                       OFF)
+OPTION(SCALABLE_CCD_USE_DOUBLE    "Use double precision calculation"                       ON)
+OPTION(SCALABLE_CCD_TOI_PER_QUERY "Output time of impact per query in JSON"               OFF)
+option(SCALABLE_CCD_BUILD_TESTS   "Build Scalable CCD tests" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
+OPTION(SCALABLE_CCD_WITH_PROFILER "Enable profiler"          ${SCALABLE_CCD_TOPLEVEL_PROJECT})
 
 # Set default minimum C++ standard
 if(SCALABLE_CCD_TOPLEVEL_PROJECT)
@@ -131,7 +132,10 @@ include(spdlog)
 target_link_libraries(scalable_ccd PRIVATE spdlog::spdlog)
 
 # JSON
-target_link_libraries(scalable_ccd PUBLIC nlohmann_json::nlohmann_json)
+if(SCALABLE_CCD_WITH_PROFILER)
+  include(json)
+  target_link_libraries(scalable_ccd PRIVATE nlohmann_json::nlohmann_json)
+endif()
 
 if(SCALABLE_CCD_TOI_PER_QUERY)
   # rational-cpp (requires GMP)
@@ -207,11 +211,11 @@ endif()
 ################################################################################
 
 # Enable unit testing at the root level
-# if(SCALABLE_CCD_TOPLEVEL_PROJECT AND SCALABLE_CCD_BUILD_TESTS)
-#   include(CTest)
-#   enable_testing()
-#   add_subdirectory(tests)
-# endif()
+if(SCALABLE_CCD_TOPLEVEL_PROJECT AND SCALABLE_CCD_BUILD_TESTS)
+  include(CTest)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 ################################################################################
 # Binary

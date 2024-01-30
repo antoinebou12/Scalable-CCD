@@ -1,9 +1,8 @@
+#include "root_finder.cuh"
+
 #include <scalable_ccd/config.hpp>
 #include <scalable_ccd/cuda/utils/limits.cuh>
-#include <scalable_ccd/cuda/memory_handler.cuh>
-// #include <scalable_ccd/cuda/tight_inclusion/rational.hpp>
-#include <scalable_ccd/cuda/tight_inclusion/record.hpp>
-#include <scalable_ccd/cuda/tight_inclusion/root_finder.cuh>
+#include <scalable_ccd/utils/logger.hpp>
 
 #include <array>
 #include <float.h>
@@ -11,14 +10,12 @@
 
 #include <cuda/semaphore>
 
-#include <spdlog/spdlog.h>
-
 using namespace std;
 
 namespace scalable_ccd::cuda {
 
 // this function do the bisection
-__device__ interval_pair::interval_pair(const Singleinterval& itv)
+__device__ IntervalPair::IntervalPair(const Interval& itv)
 {
     Scalar c = (itv.first + itv.second) / 2;
     first.first = itv.first;
@@ -29,7 +26,7 @@ __device__ interval_pair::interval_pair(const Singleinterval& itv)
 
 __device__ bool sum_no_larger_1(const Scalar& num1, const Scalar& num2)
 {
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
     if (num1 + num2 > 1 / (1 - DBL_EPSILON)) {
         return false;
     }
@@ -40,6 +37,7 @@ __device__ bool sum_no_larger_1(const Scalar& num1, const Scalar& num2)
 #endif
     return true;
 }
+
 __device__ void compute_face_vertex_tolerance_memory_pool(
     CCDData& data_in, const CCDConfig& config)
 {
@@ -141,7 +139,7 @@ std::array<Scalar, 3> get_numerical_error(
     Scalar eefilter;
     Scalar vffilter;
     if (!use_ms) {
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         eefilter = 6.217248937900877e-15;
         vffilter = 6.661338147750939e-15;
 #else
@@ -150,7 +148,7 @@ std::array<Scalar, 3> get_numerical_error(
 #endif
     } else // using minimum separation
     {
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         eefilter = 7.105427357601002e-15;
         vffilter = 7.549516567451064e-15;
 #else
@@ -195,13 +193,13 @@ get_numerical_error_vf_memory_pool(CCDData& data_in, bool use_ms)
     Scalar vffilter;
     //   bool use_ms = false;
     if (!use_ms) {
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         vffilter = 6.661338147750939e-15;
 #else
         vffilter = 3.576279e-06;
 #endif
     } else {
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         vffilter = 7.549516567451064e-15;
 #else
         vffilter = 4.053116e-06;
@@ -248,6 +246,7 @@ get_numerical_error_vf_memory_pool(CCDData& data_in, bool use_ms)
     data_in.err[2] = zmax * zmax * zmax * vffilter;
     return;
 }
+
 __device__ __host__ void
 get_numerical_error_ee_memory_pool(CCDData& data_in, bool use_ms)
 {
@@ -255,13 +254,13 @@ get_numerical_error_ee_memory_pool(CCDData& data_in, bool use_ms)
     //   bool use_ms = false;
     if (!use_ms) {
 
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         vffilter = 6.217248937900877e-15;
 #else
         vffilter = 3.337861e-06;
 #endif
     } else {
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         vffilter = 7.105427357601002e-15;
 #else
         vffilter = 3.814698e-06;
@@ -329,6 +328,7 @@ __device__ void BoxPrimatives::calculate_tuv(const MP_unit& unit)
         v = unit.itv[2].second;
     }
 }
+
 __device__ Scalar calculate_vf(const CCDData& data_in, const BoxPrimatives& bp)
 {
     Scalar v, pt, t0, t1, t2;
@@ -343,6 +343,7 @@ __device__ Scalar calculate_vf(const CCDData& data_in, const BoxPrimatives& bp)
     pt = (t1 - t0) * bp.u + (t2 - t0) * bp.v + t0;
     return (v - pt);
 }
+
 __device__ Scalar calculate_ee(const CCDData& data_in, const BoxPrimatives& bp)
 {
     Scalar edge0_vertex0 = (data_in.v0e[bp.dim] - data_in.v0s[bp.dim]) * bp.t
@@ -400,6 +401,7 @@ inline __device__ bool Origin_in_vf_inclusion_function_memory_pool(
     }
     return true;
 }
+
 inline __device__ bool Origin_in_ee_inclusion_function_memory_pool(
     const CCDData& data_in, MP_unit& unit, Scalar& true_tol, bool& box_in)
 {
@@ -442,8 +444,8 @@ inline __device__ bool Origin_in_ee_inclusion_function_memory_pool(
     return true;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// the memory pool method
+// === the memory pool method =================================================
+
 __global__ void compute_vf_tolerance_memory_pool(
     CCDData* data, CCDConfig* config, const int query_size)
 {
@@ -459,6 +461,7 @@ __global__ void compute_vf_tolerance_memory_pool(
     data[tx].nbr_checks = 0;
     get_numerical_error_vf_memory_pool(data[tx], config[0].use_ms);
 }
+
 __global__ void compute_ee_tolerance_memory_pool(
     CCDData* data, CCDConfig* config, const int query_size)
 {
@@ -510,7 +513,7 @@ inline __device__ bool bisect_vf_memory_pool(
 #endif
     MP_unit* out)
 {
-    interval_pair halves(unit.itv[split]); // bisected
+    IntervalPair halves(unit.itv[split]); // bisected
 
     if (halves.first.first >= halves.first.second) {
         // valid_nbr = 0;
@@ -570,7 +573,7 @@ inline __device__ bool bisect_ee_memory_pool(
 #endif
     MP_unit* out)
 {
-    interval_pair halves(unit.itv[split]); // bisected
+    IntervalPair halves(unit.itv[split]); // bisected
 
     if (halves.first.first >= halves.first.second) {
         // valid_nbr = 0;
@@ -868,23 +871,19 @@ __global__ void shift_queue_pointers(CCDConfig* config)
         : config[0].mp_remaining;
 }
 
-void run_memory_pool_ccd(
-    CCDData* d_data_list,
-    MemoryHandler* memory_handler,
-    int tmp_nbr,
-    bool is_edge,
+bool run_memory_pool_ccd(
+    thrust::device_vector<CCDData>& d_data_list,
+    std::shared_ptr<MemoryHandler> memory_handler,
+    const bool is_edge,
     std::vector<int>& result_list,
-    int parallel_nbr,
-    int max_iter,
-    Scalar tol,
-    bool use_ms,
-    bool allow_zero_toi,
-    Scalar& toi,
-    int& overflow,
-    Record& r)
+    const int parallel_nbr,
+    const int max_iter,
+    const Scalar tol,
+    const bool use_ms,
+    const bool allow_zero_toi,
+    Scalar& toi)
 {
-    int nbr = tmp_nbr;
-    spdlog::trace("tmp_nbr {}", tmp_nbr);
+    const int nbr = d_data_list.size();
 
     // memory_handler->setUnitSize(/*constraint=*/sizeof(CCDConfig));
 
@@ -914,10 +913,10 @@ void run_memory_pool_ccd(
     CCDConfig* d_config;
 
     size_t unit_size = sizeof(MP_unit) * config[0].unit_size;
-    spdlog::debug("unit_size : {:d}", config[0].unit_size);
-    spdlog::debug("unit_size (bytes) : {:d}", unit_size);
-    spdlog::debug(
-        "allocatable (bytes) : {:d}", memory_handler->__getAllocatable());
+    logger().debug("unit_size: {:d}", config[0].unit_size);
+    logger().debug("unit_size (bytes): {:d}", unit_size);
+    logger().debug(
+        "allocatable (bytes): {:d}", memory_handler->__getAllocatable());
     // size_t result_size = sizeof(int) * nbr;
 
     // cudaMalloc(&d_res, result_size);
@@ -928,37 +927,41 @@ void run_memory_pool_ccd(
     gpuErrchk(cudaGetLastError());
     // Timer timer;
     // timer.start();
-    spdlog::trace("nbr: {:d}, parallel_nbr {:d}", nbr, parallel_nbr);
+    logger().trace("nbr: {:d}, parallel_nbr: {:d}", nbr, parallel_nbr);
     initialize_memory_pool<<<nbr / parallel_nbr + 1, parallel_nbr>>>(
         d_units, nbr);
     gpuErrchk(cudaDeviceSynchronize());
 
     if (is_edge) {
         compute_ee_tolerance_memory_pool<<<
-            nbr / parallel_nbr + 1, parallel_nbr>>>(d_data_list, d_config, nbr);
+            nbr / parallel_nbr + 1, parallel_nbr>>>(
+            thrust::raw_pointer_cast(d_data_list.data()), d_config, nbr);
     } else {
         compute_vf_tolerance_memory_pool<<<
-            nbr / parallel_nbr + 1, parallel_nbr>>>(d_data_list, d_config, nbr);
+            nbr / parallel_nbr + 1, parallel_nbr>>>(
+            thrust::raw_pointer_cast(d_data_list.data()), d_config, nbr);
     }
     gpuErrchk(cudaDeviceSynchronize());
 
-    spdlog::trace("MAX_QUERIES: {:d}", memory_handler->MAX_QUERIES);
-    spdlog::trace("sizeof(Scalar) {:d}", sizeof(Scalar));
+    logger().trace("MAX_QUERIES: {:d}", memory_handler->MAX_QUERIES);
+    logger().trace("sizeof(Scalar) {:d}", sizeof(Scalar));
 
     int nbr_per_loop = nbr;
     // int start = 0;
     // int end = 0;
 
-    spdlog::trace("Queue size t0: {:d}", nbr_per_loop);
+    logger().trace("Queue size t0: {:d}", nbr_per_loop);
     while (nbr_per_loop > 0) {
         if (is_edge) {
             ee_ccd_memory_pool<<<
                 nbr_per_loop / parallel_nbr + 1, parallel_nbr>>>(
-                d_units, nbr, d_data_list, d_config);
+                d_units, nbr, thrust::raw_pointer_cast(d_data_list.data()),
+                d_config);
         } else {
             vf_ccd_memory_pool<<<
                 nbr_per_loop / parallel_nbr + 1, parallel_nbr>>>(
-                d_units, nbr, d_data_list, d_config);
+                d_units, nbr, thrust::raw_pointer_cast(d_data_list.data()),
+                d_config);
         }
         gpuErrchk(cudaDeviceSynchronize());
         gpuErrchk(cudaGetLastError());
@@ -973,12 +976,12 @@ void run_memory_pool_ccd(
         // cudaMemcpyDeviceToHost); cudaMemcpy(&toi, &d_config[0].toi,
         // sizeof(Scalar),
         //            cudaMemcpyDeviceToHost);
-        // spdlog::trace("toi {}", toi);
-        // spdlog::trace("toi {:.4f}",  toi);
-        // spdlog::trace("Start {:d}, End {:d}, Queue size: {:d}",  start, end,
+        // logger().trace("toi {}", toi);
+        // logger().trace("toi {:.4f}",  toi);
+        // logger().trace("Start {:d}, End {:d}, Queue size: {:d}",  start, end,
         // nbr_per_loop);
         gpuErrchk(cudaGetLastError());
-        spdlog::trace("Queue size: {:d}", nbr_per_loop);
+        logger().trace("Queue size: {:d}", nbr_per_loop);
     }
     cudaDeviceSynchronize();
     // double tt = timer.getElapsedTimeInMicroSec();
@@ -988,14 +991,13 @@ void run_memory_pool_ccd(
     // cudaMemcpy(res, d_res, result_size, cudaMemcpyDeviceToHost);
     gpuErrchk(cudaMemcpy(
         &toi, &d_config[0].toi, sizeof(Scalar), cudaMemcpyDeviceToHost));
-    // int overflow;
+    int overflow;
     gpuErrchk(cudaMemcpy(
         &overflow, &d_config[0].overflow_flag, sizeof(int),
         cudaMemcpyDeviceToHost));
-    // if (overflow) {
-    //   spdlog::error("OVERFLOW!!!!");
-    //   abort();
-    // }
+    if (overflow) {
+        return true;
+    }
 
     gpuErrchk(cudaFree(d_units));
     gpuErrchk(cudaFree(d_config));
@@ -1007,18 +1009,18 @@ void run_memory_pool_ccd(
     // delete[] res;
     delete[] config;
     cudaError_t ct = cudaGetLastError();
-    spdlog::trace(
+    logger().trace(
         "\n******************\n{}\n******************", cudaGetErrorString(ct));
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-    CCDData* data_list = new CCDData[tmp_nbr];
+    CCDData* data_list = new CCDData[d_data_list.size()];
     // CCDConfig *config = new CCDConfig[1];
     gpuErrchk(cudaMemcpy(
-        data_list, d_data_list, sizeof(CCDData) * tmp_nbr,
+        data_list, d_data_list, sizeof(CCDData) * d_data_list.size(),
         cudaMemcpyDeviceToHost));
     // std::vector<std::pair<std::string, std::string>> symbolic_tois;
     int tpq_cnt = 0;
-    for (size_t i = 0; i < tmp_nbr; i++) {
+    for (size_t i = 0; i < d_data_list.size(); i++) {
         cuda::stq::Rational ra(data_list[i].toi);
         if (data_list[i].toi > 1)
             continue;
@@ -1037,7 +1039,7 @@ void run_memory_pool_ccd(
         //          data_list[i].toi);
         r.j_object["toi_per_query"].push_back(triple);
     }
-    spdlog::trace("tpq_cnt: {:d}", tpq_cnt);
+    logger().trace("tpq_cnt: {:d}", tpq_cnt);
     free(data_list);
     gpuErrchk(cudaDeviceSynchronize());
     // json jtmp(symbolic_tois.begin(), symbolic_tois.end());
@@ -1057,8 +1059,8 @@ void run_memory_pool_ccd(
     // ".json"); outputFilename = outputFolder / outputFilename; std::ofstream
     // o(outputFilename); o << std::setw(4) << j << std::endl;
 #endif
-    gpuErrchk(cudaFree(d_data_list));
-    return;
+
+    return false;
 }
 
 } // namespace scalable_ccd::cuda

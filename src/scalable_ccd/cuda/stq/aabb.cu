@@ -8,11 +8,10 @@
 
 #include <tbb/parallel_for.h>
 #include <tbb/global_control.h>
-#include <spdlog/spdlog.h>
 
 namespace scalable_ccd::cuda::stq {
 
-#ifndef SCALABLE_CCD_WITH_DOUBLE
+#ifndef SCALABLE_CCD_USE_DOUBLE
 namespace {
     inline float nextafter_up(float x)
     {
@@ -99,7 +98,7 @@ void addEdges(
         points.row(3) = edge_vertex1_t1;
 
         int vertexIds[3] = { edges(i, 0), edges(i, 1), -edges(i, 0) - 1 };
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         Eigen::Vector3d lower_bound =
             points.colwise().minCoeff().array() - inflation_radius;
         Eigen::Vector3d upper_bound =
@@ -137,7 +136,7 @@ void addVertices(
 
         int vertexIds[3] = { i, -i - 1, -i - 1 };
 
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         Eigen::MatrixXd lower_bound =
             points.colwise().minCoeff().array() - inflation_radius;
         Eigen::MatrixXd upper_bound =
@@ -184,7 +183,7 @@ void addFaces(
 
         int vertexIds[3] = { faces(i, 0), faces(i, 1), faces(i, 2) };
 
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
         Eigen::Vector3d lower_bound = points.colwise().minCoeff().array()
             - static_cast<double>(inflation_radius);
         Eigen::Vector3d upper_bound = points.colwise().maxCoeff().array()
@@ -213,9 +212,9 @@ void constructBoxes(
     int threads,
     Scalar inflation_radius)
 {
-    if (threads <= 0)
-        threads = std::min(tbb::info::default_concurrency(), 64);
-    spdlog::trace("constructBoxes threads : {}", threads);
+    if (threads <= 0) {
+        threads = tbb::info::default_concurrency();
+    }
     tbb::global_control thread_limiter(
         tbb::global_control::max_allowed_parallelism, threads);
     addVertices(vertices_t0, vertices_t1, inflation_radius, boxes);

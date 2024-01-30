@@ -1,7 +1,6 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
-#include <cuda/semaphore>
+// #include <cuda/semaphore>
 
 namespace scalable_ccd::cuda::stq {
 

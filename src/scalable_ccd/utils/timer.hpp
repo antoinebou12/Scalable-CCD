@@ -26,24 +26,24 @@ public:
         is_running = false;
     }
 
-    double getElapsedTimeInSec()
+    double getElapsedTimeInSec() const
     {
         return std::chrono::duration<double>(m_stop - m_start).count();
     }
 
-    double getElapsedTimeInMilliSec()
+    double getElapsedTimeInMilliSec() const
     {
         return std::chrono::duration<double, std::milli>(m_stop - m_start)
             .count();
     }
 
-    double getElapsedTimeInMicroSec()
+    double getElapsedTimeInMicroSec() const
     {
         return std::chrono::duration<double, std::micro>(m_stop - m_start)
             .count();
     }
 
-    double getElapsedTimeInNanoSec()
+    double getElapsedTimeInNanoSec() const
     {
         return std::chrono::duration<double, std::nano>(m_stop - m_start)
             .count();

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
+#include <scalable_ccd/utils/logger.hpp>
 
 #define gpuErrchk(ans)                                                         \
     {                                                                          \
@@ -13,7 +13,7 @@ inline void gpuAssert(
     cudaError_t code, const std::string& file, int line, bool abort = true)
 {
     if (code != cudaSuccess) {
-        spdlog::error(
+        logger().error(
             "GPUassert: {} {} {:d}", cudaGetErrorString(code), file, line);
         if (abort)
             exit(code);

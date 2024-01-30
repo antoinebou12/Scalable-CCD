@@ -4,7 +4,7 @@
 
 namespace scalable_ccd {
 
-#ifdef SCALABLE_CCD_WITH_DOUBLE
+#ifdef SCALABLE_CCD_USE_DOUBLE
 using Scalar = double;
 #else
 using Scalar = float;
