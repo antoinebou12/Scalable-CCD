@@ -7,12 +7,17 @@
 namespace scalable_ccd::cuda {
 
 __device__ __host__ struct MemoryHandler {
-
+    /// @brief Maximum number of boxes to process in a single kernel launch.
     size_t MAX_OVERLAP_CUTOFF = 0;
+    /// @brief Maximum number of overlaps to store in a single kernel launch.
     size_t MAX_OVERLAP_SIZE = 0;
+    /// @brief
     size_t MAX_UNIT_SIZE = 0;
+    /// @brief
     size_t MAX_QUERIES = 0;
+    /// @brief The real number of overlaps found in the last kernel launch.
     int realcount = 0;
+    /// @brief
     int limitGB = 0;
 
     size_t __getAllocatable()
@@ -120,23 +125,23 @@ __device__ __host__ struct MemoryHandler {
 
     void handleBroadPhaseOverflow(int desired_count)
     {
-        size_t allocatable = __getAllocatable();
-        size_t largest_overlap_size = __getLargestOverlap();
+        const size_t allocatable = __getAllocatable();
+        const size_t largest_overlap_size = __getLargestOverlap();
 
         MAX_OVERLAP_SIZE =
             std::min(largest_overlap_size, static_cast<size_t>(desired_count));
-        logger().info(
-            "Setting MAX_OVERLAP_SIZE to {:.2f}% ({:d}) of allocatable memory",
-            static_cast<float>(MAX_OVERLAP_SIZE) * sizeof(int2) / allocatable
-                * 100,
-            MAX_OVERLAP_SIZE);
 
         if (MAX_OVERLAP_SIZE < desired_count) {
-            MAX_OVERLAP_CUTOFF >>= 1;
+            MAX_OVERLAP_CUTOFF >>= 1; // ÷ 2
             logger().debug(
-                "Insufficient memory to increase overlap size, shrinking cutoff 0.5x to {:d}",
+                "Insufficient memory to increase overlap size; shrinking cutoff by half to {:d}.",
                 MAX_OVERLAP_CUTOFF);
         }
+
+        logger().debug(
+            "Setting MAX_OVERLAP_SIZE to {:d} ({:.2f}% of allocatable memory)",
+            MAX_OVERLAP_SIZE,
+            100 * double(MAX_OVERLAP_SIZE * sizeof(int2)) / allocatable);
     }
 };
 

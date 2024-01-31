@@ -196,7 +196,7 @@ void sweep(
     if (variance[1] > variance[0]) {
         sort_axis = 1;
     }
-    if (variance.size() == 2 && variance[2] > variance[sort_axis]) {
+    if (variance.size() == 3 && variance[2] > variance[sort_axis]) {
         sort_axis = 2;
     }
 }

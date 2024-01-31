@@ -1,6 +1,8 @@
 set(SOURCES
     aabb.cu
     aabb.cuh
+    broadphase_multigpu.cu
+    broadphase_multigpu.cuh
     broadphase.cu
     broadphase.cuh
     collision.cu

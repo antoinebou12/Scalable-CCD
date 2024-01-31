@@ -123,7 +123,7 @@ __global__ void splitBoxes(
     mini[tid] = MiniBox(tid, min, max, boxes[tid].vertexIds);
 }
 
-__global__ void runSAPVanilla(
+__global__ void runSAP(
     const Scalar2* const boxMinor,
     const MiniBox* const boxVerts,
     const int num_boxes,
