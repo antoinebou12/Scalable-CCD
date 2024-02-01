@@ -16,7 +16,7 @@ __device__ __host__ struct MemoryHandler {
     /// @brief
     size_t MAX_QUERIES = 0;
     /// @brief The real number of overlaps found in the last kernel launch.
-    int realcount = 0;
+    int real_count = 0;
     /// @brief
     int limitGB = 0;
 
@@ -29,17 +29,53 @@ __device__ __host__ struct MemoryHandler {
         const size_t used = total - free;
 
         const size_t default_allocatable = static_cast<size_t>(0.95 * free);
-        const size_t tmp = limitGB * 0x40000000;
+        const size_t limit = limitGB << 30; // convert to bytes
 
         const size_t user_allocatable =
-            tmp > used ? (tmp - used) : default_allocatable;
+            limit > used ? (limit - used) : default_allocatable;
 
-        logger().debug(
-            "Can allocate {:g} of {:g} GiB ({:.2f}%) memory",
+        logger().trace(
+            "Can allocate {:g} of {:g} GB ({:.2f}%) memory",
             user_allocatable / 1e9, total / 1e9,
             100 * static_cast<double>(user_allocatable) / total);
 
         return std::min(default_allocatable, user_allocatable);
+    }
+
+    size_t __getLargestOverlap(const size_t allocatable)
+    {
+        constexpr size_t constant_memory_size =
+            sizeof(MemoryHandler) + 2 * sizeof(int) + sizeof(CCDConfig);
+        // extra space for shrink_to_fit
+        constexpr size_t per_overlap_memory_size =
+            sizeof(CCDData) + 3 * sizeof(int2);
+        return (allocatable - constant_memory_size) / per_overlap_memory_size;
+    }
+
+    void setOverlapSize()
+    {
+        MAX_OVERLAP_SIZE = __getLargestOverlap(__getAllocatable());
+    }
+
+    void handleBroadPhaseOverflow(int desired_count)
+    {
+        const size_t allocatable = __getAllocatable();
+        const size_t largest_overlap_size = __getLargestOverlap(allocatable);
+
+        MAX_OVERLAP_SIZE =
+            std::min(largest_overlap_size, static_cast<size_t>(desired_count));
+
+        if (MAX_OVERLAP_SIZE < desired_count) {
+            MAX_OVERLAP_CUTOFF >>= 1; // ÷ 2
+            logger().debug(
+                "Insufficient memory to increase overlap size; shrinking cutoff by half to {:d}.",
+                MAX_OVERLAP_CUTOFF);
+        } else {
+            logger().debug(
+                "Setting MAX_OVERLAP_SIZE to {:d} ({:.2f}% of allocatable memory)",
+                MAX_OVERLAP_SIZE,
+                100 * double(MAX_OVERLAP_SIZE * sizeof(int2)) / allocatable);
+        }
     }
 
     void handleNarrowPhase(int& nbr)
@@ -112,36 +148,6 @@ __device__ __host__ struct MemoryHandler {
         }
         nbr = std::min(
             MAX_UNIT_SIZE, std::min(static_cast<size_t>(nbr), MAX_QUERIES));
-    }
-
-    size_t __getLargestOverlap()
-    {
-        size_t allocatable = __getAllocatable();
-        return (allocatable - sizeof(CCDConfig))
-            / (sizeof(CCDData) + 3 * sizeof(int2));
-    }
-
-    void setOverlapSize() { MAX_OVERLAP_SIZE = __getLargestOverlap(); }
-
-    void handleBroadPhaseOverflow(int desired_count)
-    {
-        const size_t allocatable = __getAllocatable();
-        const size_t largest_overlap_size = __getLargestOverlap();
-
-        MAX_OVERLAP_SIZE =
-            std::min(largest_overlap_size, static_cast<size_t>(desired_count));
-
-        if (MAX_OVERLAP_SIZE < desired_count) {
-            MAX_OVERLAP_CUTOFF >>= 1; // ÷ 2
-            logger().debug(
-                "Insufficient memory to increase overlap size; shrinking cutoff by half to {:d}.",
-                MAX_OVERLAP_CUTOFF);
-        }
-
-        logger().debug(
-            "Setting MAX_OVERLAP_SIZE to {:d} ({:.2f}% of allocatable memory)",
-            MAX_OVERLAP_SIZE,
-            100 * double(MAX_OVERLAP_SIZE * sizeof(int2)) / allocatable);
     }
 };
 

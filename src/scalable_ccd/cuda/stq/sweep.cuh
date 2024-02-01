@@ -1,5 +1,7 @@
 #pragma once
 
+#include <scalable_ccd/cuda/types.cuh>
+#include <scalable_ccd/cuda/memory_handler.cuh>
 #include <scalable_ccd/cuda/stq/collision.cuh>
 
 namespace scalable_ccd::cuda::stq {

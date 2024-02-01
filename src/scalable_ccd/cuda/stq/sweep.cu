@@ -42,8 +42,9 @@ __global__ void retrieve_collision_pairs(
     while (a.max.x >= b.min.x) // boxes can touch and collide
     {
         i++;
-        if (does_collide(a, b) && !covertex(a.vertexIds, b.vertexIds))
-            add_overlap(a.id, b.id, count, overlaps, guess);
+        if (does_collide(a, b) && !covertex(a.vertexIds, b.vertexIds)) {
+            add_overlap(a.id, b.id, guess, overlaps, count);
+        }
 
         ntid++;
         nltid++;
@@ -159,7 +160,8 @@ __global__ void runSAP(
             && is_valid_pair(amini.vertexIds, bmini.vertexIds)
             && !covertex(amini.vertexIds, bmini.vertexIds)) {
             add_overlap(
-                amini.id, bmini.id, count, overlaps, start, memory_handler);
+                amini.id, bmini.id, memory_handler->MAX_OVERLAP_SIZE, overlaps,
+                count, &memory_handler->real_count);
         }
 
         ntid++;
@@ -223,7 +225,9 @@ __global__ void runSTQ(
         // and not sharing same vertex
         if (does_collide(ax, bx) && is_valid_pair(ax.vertexIds, bx.vertexIds)
             && !covertex(ax.vertexIds, bx.vertexIds)) {
-            add_overlap(ax.id, bx.id, count, overlaps, start, memory_handler);
+            add_overlap(
+                ax.id, bx.id, memory_handler->MAX_OVERLAP_SIZE, overlaps, count,
+                &memory_handler->real_count);
         }
 
         // Repeat major axis check and push to queue if they collide

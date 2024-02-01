@@ -106,9 +106,9 @@ public:
     Scalar v1e[3];
     Scalar v2e[3];
     Scalar v3e[3];
-    Scalar ms;     // minimum separation
     Scalar err[3]; // error bound of each query, calculated from each scene
     Scalar tol[3]; // domain tolerance to help decide which dimension to split
+    Scalar ms;     // minimum separation
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
     Scalar toi;
     int aid;
