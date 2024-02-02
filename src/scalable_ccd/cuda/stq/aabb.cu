@@ -11,197 +11,134 @@
 
 namespace scalable_ccd::cuda::stq {
 
-#ifndef SCALABLE_CCD_USE_DOUBLE
+AABB::AABB(const Scalar3& _min, const Scalar3& _max) : min(_min), max(_max)
+{
+    assert(min.x <= max.x && min.y <= max.y && min.z <= max.z);
+}
+
+AABB AABB::from_point(const Scalar3& p, const double inflation_radius)
+{
+    Scalar3 min = p, max = p;
+    conservative_inflation(min, max, inflation_radius);
+    return AABB(min, max);
+}
+
+void AABB::conservative_inflation(
+    Scalar3& min, Scalar3& max, const double inflation_radius)
+{
+    min.x = nextafter_down(min.x) - nextafter_up(inflation_radius);
+    min.y = nextafter_down(min.y) - nextafter_up(inflation_radius);
+    min.z = nextafter_down(min.z) - nextafter_up(inflation_radius);
+    max.x = nextafter_up(max.x) + nextafter_up(inflation_radius);
+    max.y = nextafter_up(max.y) + nextafter_up(inflation_radius);
+    max.z = nextafter_up(max.z) + nextafter_up(inflation_radius);
+}
+
+// ----------------------------------------------------------------------------
+
+bool AABB::is_vertex(const int3& vids) { return vids.z < 0 && vids.y < 0; }
+bool AABB::is_edge(const int3& vids) { return vids.z < 0 && vids.y >= 0; }
+bool AABB::is_face(const int3& vids) { return vids.z >= 0; }
+
+bool AABB::is_vertex() const { return AABB::is_vertex(vertex_ids); }
+bool AABB::is_edge() const { return AABB::is_edge(vertex_ids); }
+bool AABB::is_face() const { return AABB::is_face(vertex_ids); }
+
+bool AABB::is_valid_pair(const int3& a, const int3& b)
+{
+    return (is_vertex(a) && is_face(b)) || (is_face(a) && is_vertex(b))
+        || (is_edge(a) && is_edge(b));
+}
+
+bool AABB::is_valid_pair(const AABB& a, const AABB& b)
+{
+    return AABB::is_valid_pair(a.vertex_ids, b.vertex_ids);
+}
+
+// ----------------------------------------------------------------------------
 namespace {
-    inline float nextafter_up(float x)
+
+    void build_vertex_boxes(
+        const Eigen::MatrixXd& _vertices_t0,
+        const Eigen::MatrixXd& _vertices_t1,
+        std::vector<AABB>& boxes,
+        const double inflation_radius)
     {
-        return nextafterf(x, x + std::numeric_limits<float>::max());
+        assert(_vertices_t0.rows() == _vertices_t1.rows());
+        assert(_vertices_t0.cols() == _vertices_t1.cols());
+        assert(_vertices_t0.cols() == 3);
+        assert(boxes.size() >= _vertices_t0.rows());
+
+#ifdef SCALABLE_CCD_USE_DOUBLE
+        const Eigen::MatrixXd& vertices_t0 = _vertices_t0;
+        const Eigen::MatrixXd& vertices_t1 = _vertices_t1;
+#else
+        const Eigen::MatrixXf vertices_t0 = _vertices_t0.cast<float>();
+        const Eigen::MatrixXf vertices_t1 = _vertices_t1.cast<float>();
+#endif
+
+        tbb::parallel_for(
+            tbb::blocked_range<long>(0, vertices_t0.rows()),
+            [&](const tbb::blocked_range<long>& r) {
+                for (long i = r.begin(); i < r.end(); i++) {
+                    boxes[i] = AABB::from_point(
+                        make_Scalar3(
+                            vertices_t0(i, 0), vertices_t0(i, 1),
+                            vertices_t0(i, 2)),
+                        make_Scalar3(
+                            vertices_t1(i, 0), vertices_t1(i, 1),
+                            vertices_t1(i, 2)),
+                        inflation_radius);
+                    boxes[i].vertex_ids = make_int3(i, -i - 1, -i - 1);
+                    boxes[i].box_id = i;
+                    boxes[i].element_id = i;
+                }
+            });
     }
 
-    inline float nextafter_down(float x)
+    void build_edge_boxes(
+        const Eigen::MatrixXi& edges,
+        const size_t edge_offset,
+        std::vector<AABB>& boxes)
     {
-        return nextafterf(x, x - std::numeric_limits<float>::max());
+        assert(boxes.size() >= edges.rows() + edge_offset);
+
+        tbb::parallel_for(
+            tbb::blocked_range<size_t>(0, edges.rows()),
+            [&](const tbb::blocked_range<size_t>& r) {
+                for (size_t i = r.begin(); i < r.end(); i++) {
+                    boxes[edge_offset + i] =
+                        AABB(boxes[edges(i, 0)], boxes[edges(i, 1)]);
+                    boxes[edge_offset + i].vertex_ids =
+                        make_int3(edges(i, 0), edges(i, 1), -edges(i, 0) - 1);
+                    boxes[edge_offset + i].box_id = edge_offset + i;
+                    boxes[edge_offset + i].element_id = i;
+                }
+            });
+    }
+
+    void build_face_boxes(
+        const Eigen::MatrixXi& faces,
+        const size_t face_offset,
+        std::vector<AABB>& boxes)
+    {
+        assert(boxes.size() >= faces.rows() + face_offset);
+
+        tbb::parallel_for(
+            tbb::blocked_range<size_t>(0, faces.rows()),
+            [&](const tbb::blocked_range<size_t>& r) {
+                for (size_t i = r.begin(); i < r.end(); i++) {
+                    boxes[face_offset + i] = AABB(
+                        boxes[faces(i, 0)], boxes[faces(i, 1)],
+                        boxes[faces(i, 2)]);
+                    boxes[face_offset + i].vertex_ids =
+                        make_int3(faces(i, 0), faces(i, 1), faces(i, 2));
+                    boxes[face_offset + i].box_id = face_offset + i;
+                    boxes[face_offset + i].element_id = i;
+                }
+            });
     }
 } // namespace
-#endif
-
-__host__ __device__ bool is_face(const AABB& x) { return x.vertexIds.z >= 0; }
-
-__host__ __device__ bool is_face(const int3& vids) { return vids.z >= 0; }
-
-__host__ __device__ bool is_edge(const AABB& x)
-{
-    return x.vertexIds.z < 0 && x.vertexIds.y >= 0;
-}
-
-__host__ __device__ bool is_edge(const int3& vids)
-{
-    return vids.z < 0 && vids.y >= 0;
-}
-
-__host__ __device__ bool is_vertex(const AABB& x)
-{
-    return x.vertexIds.z < 0 && x.vertexIds.y < 0;
-}
-
-__host__ __device__ bool is_vertex(const int3& vids)
-{
-    return vids.z < 0 && vids.y < 0;
-}
-
-__host__ __device__ bool is_valid_pair(const AABB& a, const AABB& b)
-{
-    return (is_vertex(a) && is_face(b)) || (is_face(a) && is_vertex(b))
-        || (is_edge(a) && is_edge(b));
-}
-
-__host__ __device__ bool is_valid_pair(const int3& a, const int3& b)
-{
-    return (is_vertex(a) && is_face(b)) || (is_face(a) && is_vertex(b))
-        || (is_edge(a) && is_edge(b));
-}
-
-void merge_local_boxes(
-    const tbb::enumerable_thread_specific<std::vector<AABB>>& storages,
-    std::vector<AABB>& boxes)
-{
-    size_t num_boxes = boxes.size();
-    for (const auto& local_boxes : storages) {
-        num_boxes += local_boxes.size();
-    }
-    // serial merge!
-    boxes.reserve(num_boxes);
-    for (const auto& local_boxes : storages) {
-        boxes.insert(boxes.end(), local_boxes.begin(), local_boxes.end());
-    }
-}
-
-void addEdges(
-    const Eigen::MatrixXd& vertices_t0,
-    const Eigen::MatrixXd& vertices_t1,
-    const Eigen::MatrixXi& edges,
-    Scalar inflation_radius,
-    std::vector<AABB>& boxes)
-{
-    tbb::enumerable_thread_specific<std::vector<AABB>> storages;
-    tbb::parallel_for(0, static_cast<int>(edges.rows()), 1, [&](int& i) {
-        // for (unsigned long i = 0; i < edges.rows(); i++) {
-        Eigen::MatrixXd edge_vertex0_t0 = vertices_t0.row(edges(i, 0));
-        Eigen::MatrixXd edge_vertex1_t0 = vertices_t0.row(edges(i, 1));
-        Eigen::MatrixXd edge_vertex0_t1 = vertices_t1.row(edges(i, 0));
-        Eigen::MatrixXd edge_vertex1_t1 = vertices_t1.row(edges(i, 1));
-
-        Eigen::MatrixXd points(4, edge_vertex0_t0.size());
-        points.row(0) = edge_vertex0_t0;
-        points.row(1) = edge_vertex1_t0;
-        points.row(2) = edge_vertex0_t1;
-        points.row(3) = edge_vertex1_t1;
-
-        int vertexIds[3] = { edges(i, 0), edges(i, 1), -edges(i, 0) - 1 };
-#ifdef SCALABLE_CCD_USE_DOUBLE
-        Eigen::Vector3d lower_bound =
-            points.colwise().minCoeff().array() - inflation_radius;
-        Eigen::Vector3d upper_bound =
-            points.colwise().maxCoeff().array() + inflation_radius;
-#else
-
-    Eigen::MatrixXf lower_bound =
-        points.colwise().minCoeff().unaryExpr(&nextafter_down).array() - nextafter_up(inflation_radius);
-    Eigen::MatrixXf upper_bound =
-        points.colwise().maxCoeff().unaryExpr(&nextafter_up).array() + nextafter_up(inflation_radius);
-#endif
-        auto& local_boxes = storages.local();
-        local_boxes.emplace_back(
-            boxes.size() + i, i, vertexIds, lower_bound.data(),
-            upper_bound.data());
-    });
-    merge_local_boxes(storages, boxes);
-}
-
-void addVertices(
-    const Eigen::MatrixXd& vertices_t0,
-    const Eigen::MatrixXd& vertices_t1,
-    Scalar inflation_radius,
-    std::vector<AABB>& boxes)
-{
-    tbb::enumerable_thread_specific<std::vector<AABB>> storages;
-    tbb::parallel_for(0, static_cast<int>(vertices_t0.rows()), 1, [&](int& i) {
-        // for (unsigned long i = 0; i < vertices_t0.rows(); i++) {
-        Eigen::MatrixXd vertex_t0 = vertices_t0.row(i);
-        Eigen::MatrixXd vertex_t1 = vertices_t1.row(i);
-
-        Eigen::MatrixXd points(2, vertex_t0.size());
-        points.row(0) = vertex_t0;
-        points.row(1) = vertex_t1;
-
-        int vertexIds[3] = { i, -i - 1, -i - 1 };
-
-#ifdef SCALABLE_CCD_USE_DOUBLE
-        Eigen::MatrixXd lower_bound =
-            points.colwise().minCoeff().array() - inflation_radius;
-        Eigen::MatrixXd upper_bound =
-            points.colwise().maxCoeff().array() + inflation_radius;
-#else
-
-    Eigen::MatrixXf lower_bound =
-        points.colwise().minCoeff().unaryExpr(&nextafter_down).array() - nextafter_up(inflation_radius);;
-    Eigen::MatrixXf upper_bound =
-    points.colwise().maxCoeff().unaryExpr(&nextafter_up).array() +  nextafter_up(inflation_radius);;
-#endif
-        auto& local_boxes = storages.local();
-        local_boxes.emplace_back(
-            boxes.size() + i, i, vertexIds, lower_bound.data(),
-            upper_bound.data());
-    });
-    merge_local_boxes(storages, boxes);
-}
-
-void addFaces(
-    const Eigen::MatrixXd& vertices_t0,
-    const Eigen::MatrixXd& vertices_t1,
-    const Eigen::MatrixXi& faces,
-    Scalar inflation_radius,
-    std::vector<AABB>& boxes)
-{
-    tbb::enumerable_thread_specific<std::vector<AABB>> storages;
-    tbb::parallel_for(0, static_cast<int>(faces.rows()), 1, [&](int& i) {
-        // for (unsigned long i = 0; i < faces.rows(); i++) {
-        Eigen::MatrixXd face_vertex0_t0 = vertices_t0.row(faces(i, 0));
-        Eigen::MatrixXd face_vertex1_t0 = vertices_t0.row(faces(i, 1));
-        Eigen::MatrixXd face_vertex2_t0 = vertices_t0.row(faces(i, 2));
-        Eigen::MatrixXd face_vertex0_t1 = vertices_t1.row(faces(i, 0));
-        Eigen::MatrixXd face_vertex1_t1 = vertices_t1.row(faces(i, 1));
-        Eigen::MatrixXd face_vertex2_t1 = vertices_t1.row(faces(i, 2));
-
-        Eigen::MatrixXd points(6, face_vertex0_t0.size());
-        points.row(0) = face_vertex0_t0;
-        points.row(1) = face_vertex1_t0;
-        points.row(2) = face_vertex2_t0;
-        points.row(3) = face_vertex0_t1;
-        points.row(4) = face_vertex1_t1;
-        points.row(5) = face_vertex2_t1;
-
-        int vertexIds[3] = { faces(i, 0), faces(i, 1), faces(i, 2) };
-
-#ifdef SCALABLE_CCD_USE_DOUBLE
-        Eigen::Vector3d lower_bound = points.colwise().minCoeff().array()
-            - static_cast<double>(inflation_radius);
-        Eigen::Vector3d upper_bound = points.colwise().maxCoeff().array()
-            + static_cast<double>(inflation_radius);
-#else
-
-    Eigen::MatrixXf lower_bound =
-        points.colwise().minCoeff().unaryExpr(&nextafter_down).array() - nextafter_up(inflation_radius);
-    Eigen::MatrixXf upper_bound =
-        points.colwise().maxCoeff().unaryExpr(&nextafter_up).array() + nextafter_up(inflation_radius);
-#endif
-        auto& local_boxes = storages.local();
-        local_boxes.emplace_back(
-            boxes.size() + i, i, vertexIds, lower_bound.data(),
-            upper_bound.data());
-    });
-    merge_local_boxes(storages, boxes);
-}
 
 void constructBoxes(
     const Eigen::MatrixXd& vertices_t0,
@@ -209,17 +146,12 @@ void constructBoxes(
     const Eigen::MatrixXi& edges,
     const Eigen::MatrixXi& faces,
     std::vector<AABB>& boxes,
-    int threads,
     Scalar inflation_radius)
 {
-    if (threads <= 0) {
-        threads = tbb::info::default_concurrency();
-    }
-    tbb::global_control thread_limiter(
-        tbb::global_control::max_allowed_parallelism, threads);
-    addVertices(vertices_t0, vertices_t1, inflation_radius, boxes);
-    addEdges(vertices_t0, vertices_t1, edges, inflation_radius, boxes);
-    addFaces(vertices_t0, vertices_t1, faces, inflation_radius, boxes);
+    boxes.resize(vertices_t0.rows() + edges.rows() + faces.rows());
+    build_vertex_boxes(vertices_t0, vertices_t1, boxes, inflation_radius);
+    build_edge_boxes(edges, vertices_t0.rows(), boxes);
+    build_face_boxes(faces, vertices_t0.rows() + edges.rows(), boxes);
 }
 
 } // namespace scalable_ccd::cuda::stq

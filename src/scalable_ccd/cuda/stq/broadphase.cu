@@ -166,6 +166,11 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
 std::vector<std::pair<int, int>> BroadPhase::detect_overlaps()
 {
     logger().debug("Broad-phase: detecting overlaps");
+
+    // Increase the maximum overlap size because we only need to store the
+    // overlaps on the host.
+    memory_handler->setMemoryLimitForBroadPhaseOnly();
+
     std::vector<std::pair<int, int>> overlaps;
 
     while (!is_complete()) {

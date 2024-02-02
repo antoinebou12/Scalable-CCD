@@ -40,7 +40,7 @@ public:
         std::vector<AABB>& boxes,
         double inflation_radius = 0)
     {
-        constructBoxes(V0, V1, E, F, boxes, -1, inflation_radius);
+        constructBoxes(V0, V1, E, F, boxes, inflation_radius);
         return build(boxes);
     }
 

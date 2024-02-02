@@ -189,12 +189,13 @@ void runBroadPhaseMultiGPU(
             AABB a = boxes[aid];
             AABB b = boxes[bid];
 
-            if (is_vertex(a) && is_face(b)) // vertex, face
+            if (a.is_vertex() && b.is_face()) {
                 local_overlaps.emplace_back(aid, bid);
-            else if (is_edge(a) && is_edge(b))
+            } else if (a.is_edge() && b.is_edge()) {
                 local_overlaps.emplace_back(min(aid, bid), max(aid, bid));
-            else if (is_face(a) && is_vertex(b))
+            } else if (a.is_face() && b.is_vertex()) {
                 local_overlaps.emplace_back(bid, aid);
+            }
         }
 
         logger().trace(

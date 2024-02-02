@@ -15,6 +15,9 @@ __device__ __host__ struct MemoryHandler {
     size_t MAX_UNIT_SIZE = 0;
     /// @brief
     size_t MAX_QUERIES = 0;
+    /// @brief The size of the memory allocated for each overlap.
+    /// The default value accounts for Broad+Narrow Phase.
+    size_t per_overlap_memory_size = sizeof(CCDData) + 3 * sizeof(int2);
     /// @brief The real number of overlaps found in the last kernel launch.
     int real_count = 0;
     /// @brief
@@ -47,14 +50,22 @@ __device__ __host__ struct MemoryHandler {
         constexpr size_t constant_memory_size =
             sizeof(MemoryHandler) + 2 * sizeof(int) + sizeof(CCDConfig);
         // extra space for shrink_to_fit
-        constexpr size_t per_overlap_memory_size =
-            sizeof(CCDData) + 3 * sizeof(int2);
         return (allocatable - constant_memory_size) / per_overlap_memory_size;
     }
 
     void setOverlapSize()
     {
         MAX_OVERLAP_SIZE = __getLargestOverlap(__getAllocatable());
+    }
+
+    void setMemoryLimitForBroadPhaseOnly()
+    {
+        per_overlap_memory_size = 3 * sizeof(int2);
+    }
+
+    void setMemoryLimitForNarrowAndBroadPhase()
+    {
+        per_overlap_memory_size = sizeof(CCDData) + 3 * sizeof(int2);
     }
 
     void handleBroadPhaseOverflow(int desired_count)

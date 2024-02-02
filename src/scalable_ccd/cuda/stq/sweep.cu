@@ -42,8 +42,8 @@ __global__ void retrieve_collision_pairs(
     while (a.max.x >= b.min.x) // boxes can touch and collide
     {
         i++;
-        if (does_collide(a, b) && !covertex(a.vertexIds, b.vertexIds)) {
-            add_overlap(a.id, b.id, guess, overlaps, count);
+        if (does_collide(a, b) && !covertex(a.vertex_ids, b.vertex_ids)) {
+            add_overlap(a.box_id, b.box_id, guess, overlaps, count);
         }
 
         ntid++;
@@ -121,7 +121,7 @@ __global__ void splitBoxes(
         max = (Scalar[2]) { boxes[tid].max.x, boxes[tid].max.y };
     }
 
-    mini[tid] = MiniBox(tid, min, max, boxes[tid].vertexIds);
+    mini[tid] = MiniBox(min, max, boxes[tid].vertex_ids, tid);
 }
 
 __global__ void runSAP(
@@ -157,11 +157,11 @@ __global__ void runSAP(
 
     while (a.y >= b_x && ntid < num_boxes) {
         if (does_collide(amini, bmini)
-            && is_valid_pair(amini.vertexIds, bmini.vertexIds)
-            && !covertex(amini.vertexIds, bmini.vertexIds)) {
+            && AABB::is_valid_pair(amini.vertex_ids, bmini.vertex_ids)
+            && !covertex(amini.vertex_ids, bmini.vertex_ids)) {
             add_overlap(
-                amini.id, bmini.id, memory_handler->MAX_OVERLAP_SIZE, overlaps,
-                count, &memory_handler->real_count);
+                amini.box_id, bmini.box_id, memory_handler->MAX_OVERLAP_SIZE,
+                overlaps, count, &memory_handler->real_count);
         }
 
         ntid++;
@@ -223,11 +223,12 @@ __global__ void runSTQ(
 
         // Check for collision, matching simplex pair (edge-edge, vertex-face)
         // and not sharing same vertex
-        if (does_collide(ax, bx) && is_valid_pair(ax.vertexIds, bx.vertexIds)
-            && !covertex(ax.vertexIds, bx.vertexIds)) {
+        if (does_collide(ax, bx)
+            && AABB::is_valid_pair(ax.vertex_ids, bx.vertex_ids)
+            && !covertex(ax.vertex_ids, bx.vertex_ids)) {
             add_overlap(
-                ax.id, bx.id, memory_handler->MAX_OVERLAP_SIZE, overlaps, count,
-                &memory_handler->real_count);
+                ax.box_id, bx.box_id, memory_handler->MAX_OVERLAP_SIZE,
+                overlaps, count, &memory_handler->real_count);
         }
 
         // Repeat major axis check and push to queue if they collide
