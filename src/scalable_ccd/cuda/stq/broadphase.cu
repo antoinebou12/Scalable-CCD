@@ -11,6 +11,8 @@
 
 #include <tbb/parallel_for.h>
 
+#define SCALABLE_CCD_USE_CUDA_SAP // for comparison with SAP
+
 namespace scalable_ccd::cuda::stq {
 
 void BroadPhase::clear()
@@ -31,7 +33,7 @@ void BroadPhase::clear()
 
     num_boxes_per_thread = 0;
     threads_per_block = 32;
-    start_thread_id = 0;
+    thread_start_box_id = 0;
     num_devices = 1;
 }
 
@@ -98,67 +100,65 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
         "Max overlap cutoff: {:d}", memory_handler->MAX_OVERLAP_CUTOFF);
 
     // Device memory_handler to keep track of vars
-    device_variable<MemoryHandler> d_memory_handler;
+    DeviceVariable<MemoryHandler> d_memory_handler;
 
+    // Allocate a large chunk of memory for overlaps
+    DeviceBuffer<int2> d_overlaps_buffer;
     do {
         // Allocate a large chunk of memory for overlaps
-        // d_overlaps.resize(memory_handler->MAX_OVERLAP_CUTOFF);
-        d_overlaps.resize(memory_handler->MAX_OVERLAP_SIZE);
+        d_overlaps_buffer.clear(); // Reset size to 0
+        d_overlaps_buffer.reserve(memory_handler->MAX_OVERLAP_SIZE);
 
         memory_handler->real_count = 0;     // Reset real count
         d_memory_handler = *memory_handler; // Update memory handler on device
 
         {
             SCALABLE_CCD_GPU_PROFILE_POINT("runSTQ");
-            // This will be the actual number of overlaps
-            device_variable<int> d_num_overlaps(0);
-            device_variable<int> d_start(start_thread_id);
-            // runSTQ<<<grid_dim_1d(), threads_per_block>>>(
-            //     thrust::raw_pointer_cast(d_sm.data()),
-            //     thrust::raw_pointer_cast(d_mini.data()),
-            //     /*num_boxes=*/d_boxes.size(),
-            //     thrust::raw_pointer_cast(d_overlaps.data()),
-            //     thrust::raw_pointer_cast(d_num_overlaps.data()),
-            //     thrust::raw_pointer_cast(d_start.data()),
-            //     thrust::raw_pointer_cast(d_memory_handler.data()));
 
+#ifdef SCALABLE_CCD_USE_CUDA_SAP
             runSAP<<<grid_dim_1d(), threads_per_block>>>(
                 thrust::raw_pointer_cast(d_sm.data()),
-                thrust::raw_pointer_cast(d_mini.data()),
-                /*num_boxes=*/d_boxes.size(),
-                thrust::raw_pointer_cast(d_overlaps.data()),
-                d_num_overlaps.ptr(), d_start.ptr(), d_memory_handler.ptr());
+                thrust::raw_pointer_cast(d_mini.data()), d_boxes.size(),
+                thread_start_box_id, d_overlaps_buffer, &d_memory_handler);
+#else
+            runSTQ<<<grid_dim_1d(), threads_per_block>>>(
+                thrust::raw_pointer_cast(d_sm.data()),
+                thrust::raw_pointer_cast(d_mini.data()), d_boxes.size(),
+                thread_start_box_id, d_overlaps_buffer, &d_memory_handler);
+#endif
 
             gpuErrchk(cudaDeviceSynchronize());
-
-            // Resize overlaps to actual size (keeps the capacity the same)
-            d_overlaps.resize(d_num_overlaps);
         }
 
         *memory_handler = d_memory_handler;
 
-        if (d_overlaps.size() < memory_handler->real_count) {
+        if (d_overlaps_buffer.size() < memory_handler->real_count) {
             logger().debug(
                 "Found {:d} overlaps, but {:d} exist; re-running.",
-                d_overlaps.size(), memory_handler->real_count);
+                d_overlaps_buffer.size(), memory_handler->real_count);
 
             // Increase MAX_OVERLAP_SIZE (or decrease MAX_OVERLAP_CUTOFF)
             memory_handler->handleBroadPhaseOverflow(
                 memory_handler->real_count);
         }
-    } while (d_overlaps.size() < memory_handler->real_count);
-    assert(memory_handler->real_count == d_overlaps.size());
+    } while (d_overlaps_buffer.size() < memory_handler->real_count);
+    assert(memory_handler->real_count == d_overlaps_buffer.size());
 
-    // Increase start_thread_id for next run
-    start_thread_id += memory_handler->MAX_OVERLAP_CUTOFF;
+    // Increase thread_start_box_id for next run
+    thread_start_box_id += memory_handler->MAX_OVERLAP_CUTOFF;
 
-    // Free up excess memory
-    d_overlaps.shrink_to_fit();
+    // Move overlaps from buffer to d_overlaps
+    if (d_overlaps_buffer.size() > 0) {
+        d_overlaps = thrust::device_vector<int2>(
+            d_overlaps_buffer.begin(), d_overlaps_buffer.end());
+    } else {
+        d_overlaps.clear();
+    }
 
     logger().debug(
         "Final count for device {:d}: {:d} ({:g} GB)", 0, d_overlaps.size(),
         d_overlaps.size() * sizeof(int2) / 1e9);
-    logger().trace("Next threadstart {:d}", start_thread_id);
+    logger().trace("Next starting box id: {:d}", thread_start_box_id);
 
     return d_overlaps;
 }
@@ -204,11 +204,11 @@ Dimension BroadPhase::calc_sort_dimension() const
     logger().trace("mean: x {:.6f} y {:.6f} z {:.6f}", mean.x, mean.y, mean.z);
 
     // calculate variance and determine which axis to sort on
-    device_variable<Scalar3> d_variance(make_Scalar3(0, 0, 0));
+    DeviceVariable<Scalar3> d_variance(make_Scalar3(0, 0, 0));
 
     calc_variance<<<grid_dim_1d(), threads_per_block, smemSize>>>(
         thrust::raw_pointer_cast(d_boxes.data()), d_boxes.size(),
-        thrust::raw_pointer_cast(d_mean.data()), d_variance.ptr());
+        thrust::raw_pointer_cast(d_mean.data()), &d_variance);
     cudaDeviceSynchronize();
 
     const Scalar3 variance = d_variance;

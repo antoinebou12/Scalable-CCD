@@ -62,7 +62,7 @@ public:
     std::vector<std::pair<int, int>> detect_overlaps();
 
     /// @brief Is the broad phase algorithm complete?
-    bool is_complete() const { return start_thread_id >= d_boxes.size(); }
+    bool is_complete() const { return thread_start_box_id >= d_boxes.size(); }
 
     /// @brief Get the boxes stored on the GPU.
     const thrust::device_vector<cuda::stq::AABB>& boxes() { return d_boxes; }
@@ -88,7 +88,7 @@ private:
 
     int num_boxes_per_thread = 0;
     int threads_per_block = 32;
-    int start_thread_id = 0;
+    int thread_start_box_id = 0;
     int num_devices = 1;
 
     int smemSize;

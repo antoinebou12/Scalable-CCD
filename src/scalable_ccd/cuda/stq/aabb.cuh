@@ -67,9 +67,9 @@ public:
 
     // ------------------------------------------------------------------------
 
-    bool is_vertex() const;
-    bool is_edge() const;
-    bool is_face() const;
+    __host__ __device__ bool is_vertex() const;
+    __host__ __device__ bool is_edge() const;
+    __host__ __device__ bool is_face() const;
 
     __host__ __device__ static bool is_vertex(const int3& vids);
     __host__ __device__ static bool is_edge(const int3& vids);

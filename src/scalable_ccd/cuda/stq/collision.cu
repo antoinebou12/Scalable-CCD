@@ -40,16 +40,11 @@ __device__ void add_overlap(
 __device__ void add_overlap(
     const int xid,
     const int yid,
-    const int max_overlap_size,
-    int2* overlaps,
-    int* count,
-    int* real_count)
+    RawDeviceBuffer<int2>& overlaps,
+    int& real_count)
 {
-    const int i = atomicAdd(real_count, 1);
-
-    if (i < max_overlap_size) {
-        overlaps[i] = make_int2(xid, yid);
-        atomicAdd(count, 1);
+    if (atomicAdd(&real_count, 1) < overlaps.capacity) {
+        overlaps.push(make_int2(xid, yid));
     }
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <scalable_ccd/cuda/stq/aabb.cuh>
+#include <scalable_ccd/cuda/utils/device_buffer.cuh>
 
 namespace scalable_ccd::cuda::stq {
 
@@ -47,9 +48,7 @@ __device__ void add_overlap(
 __device__ void add_overlap(
     const int xid,
     const int yid,
-    const int max_overlap_size,
-    int2* overlaps,
-    int* count,
-    int* real_count);
+    RawDeviceBuffer<int2>& overlaps,
+    int& real_count);
 
 } // namespace scalable_ccd::cuda::stq

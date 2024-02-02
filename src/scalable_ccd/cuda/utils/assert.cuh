@@ -20,6 +20,7 @@ inline void gpuAssert(
             "{}: {} ({}:{:d})", cudaGetErrorName(code),
             cudaGetErrorString(code), file, line);
         if (throw_on_error) {
+            assert(code == cudaSuccess);
             throw std::runtime_error(fmt::format("CUDA error {}", code));
         }
     }

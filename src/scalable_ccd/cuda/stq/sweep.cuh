@@ -3,6 +3,7 @@
 #include <scalable_ccd/cuda/types.cuh>
 #include <scalable_ccd/cuda/memory_handler.cuh>
 #include <scalable_ccd/cuda/stq/collision.cuh>
+#include <scalable_ccd/cuda/utils/device_buffer.cuh>
 
 namespace scalable_ccd::cuda::stq {
 
@@ -60,36 +61,32 @@ __global__ void splitBoxes(
 /// @brief Runs the sweep and prune tiniest queue (STQ) algorithm
 /// @param sortedMajorAxis Contains the sorted min and max values of the major axis
 /// @param boxVerts Contains the sorted min and max values of the non-major axes and vertex information to check for simplex matching and covertices
-/// @param overlaps Final output array of colliding box pairs
 /// @param num_boxes Number of boxes
-/// @param count Number of collisions
-/// @param start Start index of the thread
+/// @param start_box_id Starting box index
+/// @param overlaps Final output array of colliding box pairs
 /// @param memory_handler Memory handler
 __global__ void runSTQ(
     const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
     const int num_boxes,
-    int2* overlaps,
-    int* count,
-    int* start,
+    const int start_box_id,
+    RawDeviceBuffer<int2> overlaps,
     MemoryHandler* memory_handler);
 
 /// @brief Runs the sweep and prune (SAP) algorithm
-/// @param boxMinor
-/// @param boxVerts
-/// @param overlaps
-/// @param num_boxes
-/// @param count
-/// @param start
-/// @param memory_handler
+/// @param sortedMajorAxis Contains the sorted min and max values of the major axis
+/// @param boxVerts Contains the sorted min and max values of the non-major axes and vertex information to check for simplex matching and covertices
+/// @param num_boxes Number of boxes
+/// @param start_box_id Starting box index
+/// @param overlaps Final output array of colliding box pairs
+/// @param memory_handler Memory handler
 /// @return
 __global__ void runSAP(
-    const Scalar2* const boxMinor,
+    const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
     const int num_boxes,
-    int2* overlaps,
-    int* count,
-    int* start,
+    const int start_box_id,
+    RawDeviceBuffer<int2> overlaps,
     MemoryHandler* memory_handler);
 
 } // namespace scalable_ccd::cuda::stq

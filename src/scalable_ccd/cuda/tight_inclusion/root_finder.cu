@@ -5,7 +5,6 @@
 #include <scalable_ccd/utils/logger.hpp>
 
 #include <array>
-#include <float.h>
 #include <vector>
 
 #include <cuda/semaphore>

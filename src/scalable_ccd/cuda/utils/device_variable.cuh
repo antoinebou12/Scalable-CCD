@@ -2,36 +2,39 @@
 
 #include <scalable_ccd/cuda/utils/assert.cuh>
 
-namespace scalable_ccd::cuda::stq {
+#include <thrust/device_ptr.h>
+#include <thrust/device_malloc.h>
+#include <thrust/device_free.h>
 
-template <typename T> class device_variable {
+namespace scalable_ccd::cuda {
+
+template <typename T> class DeviceVariable {
 public:
-    device_variable() { gpuErrchk(cudaMalloc(&d_ptr, sizeof(T))); }
+    DeviceVariable() { d_ptr = thrust::device_malloc<T>(1); }
 
-    device_variable(const T& value)
+    DeviceVariable(const T& value)
     {
-        gpuErrchk(cudaMalloc(&d_ptr, sizeof(T)));
-        gpuErrchk(cudaMemcpy(d_ptr, &value, sizeof(T), cudaMemcpyHostToDevice));
+        d_ptr = thrust::device_malloc<T>(1);
+        *d_ptr = value;
     }
 
-    ~device_variable() { gpuErrchk(cudaFree(d_ptr)); }
+    // not copyable
+    DeviceVariable(const DeviceVariable&) = delete;
+    DeviceVariable& operator=(const DeviceVariable&) = delete;
 
-    void operator=(T value)
-    {
-        gpuErrchk(cudaMemcpy(d_ptr, &value, sizeof(T), cudaMemcpyHostToDevice));
-    }
+    ~DeviceVariable() { thrust::device_free(d_ptr); }
 
-    operator T() const
-    {
-        T value;
-        gpuErrchk(cudaMemcpy(&value, d_ptr, sizeof(T), cudaMemcpyDeviceToHost));
-        return value;
-    }
+    void operator=(T value) { *d_ptr = value; }
 
-    T* ptr() { return d_ptr; }
+    /// @brief Get the pointer to the device memory.
+    /// @note This does not return the address of this object, but the address of the device memory.
+    T* operator&() { return thrust::raw_pointer_cast(d_ptr); }
+    const T* operator&() const { return thrust::raw_pointer_cast(d_ptr); }
+
+    operator T() const { return *d_ptr; }
 
 private:
-    T* d_ptr;
+    thrust::device_ptr<T> d_ptr;
 };
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda
