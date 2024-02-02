@@ -67,8 +67,13 @@ __device__ __host__ struct MemoryHandler {
 
         if (MAX_OVERLAP_SIZE < desired_count) {
             MAX_OVERLAP_CUTOFF >>= 1; // ÷ 2
+            if (MAX_OVERLAP_CUTOFF < 1) {
+                throw std::runtime_error(
+                    "Insufficient memory to increase overlap size; "
+                    "cannot allocate even a single box's overlaps.");
+            }
             logger().debug(
-                "Insufficient memory to increase overlap size; shrinking cutoff by half to {:d}.",
+                "Insufficient memory to increase overlap size; shrinking box cutoff to {:d}.",
                 MAX_OVERLAP_CUTOFF);
         } else {
             logger().debug(

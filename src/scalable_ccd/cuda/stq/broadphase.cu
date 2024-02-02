@@ -38,7 +38,7 @@ void BroadPhase::clear()
 const thrust::device_vector<cuda::stq::AABB>&
 BroadPhase::build(const std::vector<cuda::stq::AABB>& boxes)
 {
-    logger().trace("Number of boxes: {:d}", boxes.size());
+    logger().debug("Broad-phase: building (# boxes: {:d})", boxes.size());
 
     if (memory_handler->MAX_OVERLAP_CUTOFF == 0) {
         memory_handler->MAX_OVERLAP_CUTOFF = boxes.size();
@@ -88,6 +88,8 @@ BroadPhase::build(const std::vector<cuda::stq::AABB>& boxes)
 
 const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
 {
+    logger().debug("Broad-phase: detecting overlaps (partial)");
+
     memory_handler->setOverlapSize();
     logger().trace(
         "Max overlap size: {:d} ({:g} GB)", memory_handler->MAX_OVERLAP_SIZE,
@@ -96,13 +98,15 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
         "Max overlap cutoff: {:d}", memory_handler->MAX_OVERLAP_CUTOFF);
 
     // Device memory_handler to keep track of vars
-    device_variable<MemoryHandler> d_memory_handler(*memory_handler);
-    const int& real_count = memory_handler->real_count;
+    device_variable<MemoryHandler> d_memory_handler;
 
     do {
         // Allocate a large chunk of memory for overlaps
         // d_overlaps.resize(memory_handler->MAX_OVERLAP_CUTOFF);
         d_overlaps.resize(memory_handler->MAX_OVERLAP_SIZE);
+
+        memory_handler->real_count = 0;     // Reset real count
+        d_memory_handler = *memory_handler; // Update memory handler on device
 
         {
             SCALABLE_CCD_GPU_PROFILE_POINT("runSTQ");
@@ -133,19 +137,17 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
 
         *memory_handler = d_memory_handler;
 
-        if (d_overlaps.size() < real_count) {
+        if (d_overlaps.size() < memory_handler->real_count) {
             logger().debug(
                 "Found {:d} overlaps, but {:d} exist; re-running.",
-                d_overlaps.size(), real_count);
+                d_overlaps.size(), memory_handler->real_count);
 
             // Increase MAX_OVERLAP_SIZE (or decrease MAX_OVERLAP_CUTOFF)
-            memory_handler->handleBroadPhaseOverflow(real_count);
-
-            // Update memory handler on device
-            d_memory_handler = *memory_handler;
+            memory_handler->handleBroadPhaseOverflow(
+                memory_handler->real_count);
         }
-    } while (d_overlaps.size() < real_count);
-    assert(real_count == d_overlaps.size());
+    } while (d_overlaps.size() < memory_handler->real_count);
+    assert(memory_handler->real_count == d_overlaps.size());
 
     // Increase start_thread_id for next run
     start_thread_id += memory_handler->MAX_OVERLAP_CUTOFF;
@@ -163,6 +165,7 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
 
 std::vector<std::pair<int, int>> BroadPhase::detect_overlaps()
 {
+    logger().debug("Broad-phase: detecting overlaps");
     std::vector<std::pair<int, int>> overlaps;
 
     while (!is_complete()) {
