@@ -10,13 +10,18 @@
 namespace scalable_ccd::cuda {
 
 inline void gpuAssert(
-    cudaError_t code, const std::string& file, int line, bool abort = true)
+    cudaError_t code,
+    const std::string& file,
+    int line,
+    bool throw_on_error = true)
 {
     if (code != cudaSuccess) {
         logger().error(
-            "GPUassert: {} {} {:d}", cudaGetErrorString(code), file, line);
-        if (abort)
-            exit(code);
+            "{}: {} ({}:{:d})", cudaGetErrorName(code),
+            cudaGetErrorString(code), file, line);
+        if (throw_on_error) {
+            throw std::runtime_error(fmt::format("CUDA error {}", code));
+        }
     }
 }
 } // namespace scalable_ccd::cuda
