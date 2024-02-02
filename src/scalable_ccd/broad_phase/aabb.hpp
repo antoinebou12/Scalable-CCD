@@ -2,29 +2,65 @@
 
 #include <scalable_ccd/scalar.hpp>
 
+#include <Eigen/Core>
+
 #include <array>
 #include <vector>
-
-#include <Eigen/Core>
 
 namespace scalable_ccd {
 
 using ArrayMax3 =
     Eigen::Array<Scalar, Eigen::Dynamic, 1, Eigen::ColMajor, 3, 1>;
 
+/// @brief Axis aligned bounding-box of some type
 class AABB {
 public:
     AABB() = default;
 
-    AABB(
-        const ArrayMax3& _min,
-        const ArrayMax3& _max,
-        const std::array<long, 3>& _vertex_ids)
-        : min(_min)
-        , max(_max)
-        , vertex_ids(_vertex_ids)
+    AABB(const ArrayMax3& min, const ArrayMax3& max);
+
+    AABB(const AABB& aabb1, const AABB& aabb2)
+        : AABB(aabb1.min.min(aabb2.min), aabb1.max.max(aabb2.max))
     {
     }
+
+    AABB(const AABB& aabb1, const AABB& aabb2, const AABB& aabb3)
+        : AABB(
+            aabb1.min.min(aabb2.min).min(aabb3.min),
+            aabb1.max.max(aabb2.max).max(aabb3.max))
+    {
+    }
+
+    /// @brief Construct an AABB for a static point.
+    /// @param p The point's position.
+    /// @param inflation_radius Radius of a sphere around the point which the AABB encloses.
+    /// @return The constructed AABB.
+    static AABB
+    from_point(const ArrayMax3& p, const double inflation_radius = 0);
+
+    /// @brief Construct an AABB for a moving point (i.e. temporal edge).
+    /// @param p_t0 The point's position at time t=0.
+    /// @param p_t1 The point's position at time t=1.
+    /// @param inflation_radius Radius of a capsule around the temporal edge which the AABB encloses.
+    /// @return The constructed AABB.
+    static AABB from_point(
+        const ArrayMax3& p_t0,
+        const ArrayMax3& p_t1,
+        const double inflation_radius = 0)
+    {
+        return AABB(
+            from_point(p_t0, inflation_radius),
+            from_point(p_t1, inflation_radius));
+    }
+
+    /// @brief Check if another AABB intersects with this one.
+    /// @param other The other AABB.
+    /// @return If the two AABBs intersect.
+    bool intersects(const AABB& other) const;
+
+    /// @brief Compute a conservative inflation of the AABB.
+    static void conservative_inflation(
+        ArrayMax3& min, ArrayMax3& max, const double inflation_radius);
 
 public:
     /// @brief Minimum corner of the AABB.
@@ -34,8 +70,17 @@ public:
     /// @brief Vertex IDs attached to the AABB.
     std::array<long, 3> vertex_ids;
     /// @brief Element ID attached to the AABB.
-    long id;
+    long element_id;
 };
+
+/// @brief Build one AABB per vertex position (row of V).
+/// @param[in] vertices Vertex positions (rowwise).
+/// @param[out] vertex_boxes Vertex AABBs.
+/// @param[in] inflation_radius Radius of a sphere around the points which the AABBs enclose.
+void build_vertex_boxes(
+    const Eigen::MatrixXd& vertices,
+    std::vector<AABB>& vertex_boxes,
+    const double inflation_radius = 0);
 
 /// @brief Build one AABB per vertex position moving linearly from t=0 to t=1.
 /// @param vertices_t0 Vertex positions at t=0 (rowwise).

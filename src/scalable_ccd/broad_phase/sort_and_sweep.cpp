@@ -15,16 +15,6 @@ namespace scalable_ccd {
 namespace {
     inline int flip_id(const int id) { return -id - 1; }
 
-    /// @brief Determine if two boxes are overlapping.
-    /// @param a The first box.
-    /// @param b The second box.
-    /// @param skip_axis The axis to skip.
-    /// @return True if the boxes are overlapping, false otherwise.
-    bool are_overlapping(const AABB& a, const AABB& b)
-    {
-        return (a.min <= b.max).all() && (b.min <= a.max).all();
-    }
-
     /// @brief Determine if two elements share a vertex.
     /// @param a Vertex ids of the first element.
     /// @param b Vertex ids of the second element.
@@ -109,18 +99,22 @@ namespace {
                             break;
                         }
 
-                        if (is_valid_pair<is_two_lists>(a.id, b.id)
-                            && are_overlapping(a, b)
+                        if (is_valid_pair<is_two_lists>(
+                                a.element_id, b.element_id)
+                            && a.intersects(b)
                             && !share_a_vertex(a.vertex_ids, b.vertex_ids)) {
                             if constexpr (is_two_lists) {
                                 // Negative IDs are from the first list
                                 local_overlaps.emplace_back(
-                                    a.id < 0 ? flip_id(a.id) : flip_id(b.id),
-                                    a.id < 0 ? b.id : a.id);
+                                    a.element_id < 0 ? flip_id(a.element_id)
+                                                     : flip_id(b.element_id),
+                                    a.element_id < 0 ? b.element_id
+                                                     : a.element_id);
                             } else {
-                                assert(a.id >= 0 && b.id >= 0);
+                                assert(a.element_id >= 0 && b.element_id >= 0);
                                 local_overlaps.emplace_back(
-                                    std::min(a.id, b.id), std::max(a.id, b.id));
+                                    std::min(a.element_id, b.element_id),
+                                    std::max(a.element_id, b.element_id));
                             }
                         }
                     }
@@ -237,7 +231,7 @@ void sort_and_sweep(
         if (i < boxesA.size() && j < boxesB.size()) {
             if (boxesA[i].min[sort_axis] < boxesB[j].min[sort_axis]) {
                 boxes[k] = boxesA[i];
-                boxes[k].id = flip_id(boxesA[i].id); // ∈ [-n, -1]
+                boxes[k].element_id = flip_id(boxesA[i].element_id);
                 i++;
             } else {
                 boxes[k] = boxesB[j];
@@ -245,7 +239,7 @@ void sort_and_sweep(
             }
         } else if (i < boxesA.size()) {
             boxes[k] = boxesA[i];
-            boxes[k].id = flip_id(boxesA[i].id); // ∈ [-n, -1]
+            boxes[k].element_id = flip_id(boxesA[i].element_id);
             i++;
         } else {
             assert(j < boxesB.size());
