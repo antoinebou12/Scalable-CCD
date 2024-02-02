@@ -5,7 +5,7 @@
 namespace scalable_ccd::cuda::stq {
 
 struct sort_aabb_x {
-    __device__ bool operator()(const Aabb& a, const Aabb& b) const
+    __device__ bool operator()(const AABB& a, const AABB& b) const
     {
         return (a.min.x < b.min.x);
     }

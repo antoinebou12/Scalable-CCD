@@ -40,7 +40,7 @@ int main(int argc, char** argv)
     else // static CD
         filet1 = argv[1];
 
-    std::vector<scalable_ccd::cuda::stq::Aabb> boxes;
+    std::vector<scalable_ccd::cuda::stq::AABB> boxes;
     Eigen::MatrixXd vertices_t0;
     Eigen::MatrixXd vertices_t1;
     Eigen::MatrixXi faces;

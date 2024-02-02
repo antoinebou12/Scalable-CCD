@@ -2,7 +2,7 @@
 
 namespace scalable_ccd::cuda::stq {
 
-__device__ bool does_collide(const Aabb& a, const Aabb& b)
+__device__ bool does_collide(const AABB& a, const AABB& b)
 {
     return
         //    a.max.x >= b.min.x && a.min.x <= b.max.x &&

@@ -17,7 +17,7 @@ namespace scalable_ccd::cuda::stq {
 /// @param end
 /// @return
 __global__ void retrieve_collision_pairs(
-    const Aabb* const boxes,
+    const AABB* const boxes,
     int* count,
     int2* overlaps,
     int num_boxes,
@@ -31,7 +31,7 @@ __global__ void retrieve_collision_pairs(
 /// @param num_boxes Number of boxes
 /// @param mean Output array for the mean
 __global__ void
-calc_mean(const Aabb* const boxes, const int num_boxes, Scalar3* mean);
+calc_mean(const AABB* const boxes, const int num_boxes, Scalar3* mean);
 
 /// @brief Calculate the variance of the box centers
 /// @param boxes Pointer to the boxes
@@ -39,7 +39,7 @@ calc_mean(const Aabb* const boxes, const int num_boxes, Scalar3* mean);
 /// @param mean Mean of the box centers
 /// @param var Output array for the variance
 __global__ void calc_variance(
-    const Aabb* const boxes,
+    const AABB* const boxes,
     const int num_boxes,
     const Scalar3* const mean,
     Scalar3* var);
@@ -51,7 +51,7 @@ __global__ void calc_variance(
 /// @param num_boxes Number of boxes
 /// @param axis Major axis
 __global__ void splitBoxes(
-    const Aabb* const boxes,
+    const AABB* const boxes,
     Scalar2* sortedmin,
     MiniBox* mini,
     const int num_boxes,

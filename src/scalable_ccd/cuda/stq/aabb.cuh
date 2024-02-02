@@ -12,7 +12,7 @@
 
 namespace scalable_ccd::cuda::stq {
 
-__global__ class Aabb {
+__global__ class AABB {
 public:
     int id;
     //   double3 block, block2;
@@ -21,7 +21,7 @@ public:
     int3 vertexIds;
     int ref_id;
 
-    Aabb(
+    AABB(
         int assignid,
         int reference_id,
         int* vids,
@@ -35,51 +35,51 @@ public:
         ref_id = reference_id;
     };
 
-    Aabb() = default;
+    AABB() = default;
 };
 
 void merge_local_boxes(
-    const tbb::enumerable_thread_specific<std::vector<Aabb>>& storages,
-    std::vector<Aabb>& boxes);
+    const tbb::enumerable_thread_specific<std::vector<AABB>>& storages,
+    std::vector<AABB>& boxes);
 
 void addEdges(
     const Eigen::MatrixXd& vertices_t0,
     const Eigen::MatrixXd& vertices_t1,
     const Eigen::MatrixXi& edges,
     Scalar inflation_radius,
-    std::vector<Aabb>& boxes);
+    std::vector<AABB>& boxes);
 
 void addVertices(
     const Eigen::MatrixXd& vertices_t0,
     const Eigen::MatrixXd& vertices_t1,
     Scalar inflation_radius,
-    std::vector<Aabb>& boxes);
+    std::vector<AABB>& boxes);
 
 void addFaces(
     const Eigen::MatrixXd& vertices_t0,
     const Eigen::MatrixXd& vertices_t1,
     const Eigen::MatrixXi& faces,
     Scalar inflation_radius,
-    std::vector<Aabb>& boxes);
+    std::vector<AABB>& boxes);
 
 void constructBoxes(
     const Eigen::MatrixXd& vertices_t0,
     const Eigen::MatrixXd& vertices_t1,
     const Eigen::MatrixXi& edges,
     const Eigen::MatrixXi& faces,
-    std::vector<Aabb>& boxes,
+    std::vector<AABB>& boxes,
     int threads = -1,
     Scalar inflation_radius = 0);
 
-// bool is_face = [](Aabb& x)
-// bool is_edge = [](Aabb& x){return x.vertexIds.z < 0 && x.vertexIds.y >= 0
-// ;}; bool is_vertex = [](Aabb& x){return x.vertexIds.z < 0  && x.vertexIds.y
+// bool is_face = [](AABB& x)
+// bool is_edge = [](AABB& x){return x.vertexIds.z < 0 && x.vertexIds.y >= 0
+// ;}; bool is_vertex = [](AABB& x){return x.vertexIds.z < 0  && x.vertexIds.y
 // < 0;};
 
-__host__ __device__ bool is_face(const Aabb& x);
-__host__ __device__ bool is_edge(const Aabb& x);
-__host__ __device__ bool is_vertex(const Aabb& x);
-__host__ __device__ bool is_valid_pair(const Aabb& x, const Aabb& y);
+__host__ __device__ bool is_face(const AABB& x);
+__host__ __device__ bool is_edge(const AABB& x);
+__host__ __device__ bool is_vertex(const AABB& x);
+__host__ __device__ bool is_valid_pair(const AABB& x, const AABB& y);
 __host__ __device__ bool is_face(const int3& vids);
 __host__ __device__ bool is_edge(const int3& vids);
 __host__ __device__ bool is_vertex(const int3& vids);
@@ -138,7 +138,7 @@ public:
 
 __global__ class RankBox {
 public:
-    Aabb* aabb;
+    AABB* aabb;
     uint64_t rank_x;
     uint64_t rank_y;
     uint64_t rank_c;

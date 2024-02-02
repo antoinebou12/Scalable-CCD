@@ -8,7 +8,7 @@
 namespace scalable_ccd::cuda::stq {
 
 __global__ void retrieve_collision_pairs(
-    const Aabb* const boxes,
+    const AABB* const boxes,
     int* count,
     int2* overlaps,
     int num_boxes,
@@ -17,7 +17,7 @@ __global__ void retrieve_collision_pairs(
     int start,
     int end)
 {
-    extern __shared__ Aabb s_objects[];
+    extern __shared__ AABB s_objects[];
     int tid = start + threadIdx.x + blockIdx.x * blockDim.x;
     int ltid = threadIdx.x;
 
@@ -36,8 +36,8 @@ __global__ void retrieve_collision_pairs(
     if (ntid >= num_boxes)
         return;
 
-    const Aabb& a = s_objects[l];
-    Aabb b = nltid < blockDim.x ? s_objects[nltid] : boxes[ntid];
+    const AABB& a = s_objects[l];
+    AABB b = nltid < blockDim.x ? s_objects[nltid] : boxes[ntid];
     int i = 0;
     while (a.max.x >= b.min.x) // boxes can touch and collide
     {
@@ -57,7 +57,7 @@ __global__ void retrieve_collision_pairs(
 }
 
 __global__ void
-calc_mean(const Aabb* const boxes, const int num_boxes, Scalar3* mean)
+calc_mean(const AABB* const boxes, const int num_boxes, Scalar3* mean)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -75,7 +75,7 @@ calc_mean(const Aabb* const boxes, const int num_boxes, Scalar3* mean)
 }
 
 __global__ void calc_variance(
-    const Aabb* const boxes,
+    const AABB* const boxes,
     const int num_boxes,
     const Scalar3* const mean,
     Scalar3* var)
@@ -93,7 +93,7 @@ __global__ void calc_variance(
 }
 
 __global__ void splitBoxes(
-    const Aabb* const boxes,
+    const AABB* const boxes,
     Scalar2* sortedmin,
     MiniBox* mini,
     const int num_boxes,

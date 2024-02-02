@@ -13,7 +13,7 @@
 namespace scalable_ccd::cuda::stq {
 
 void runBroadPhaseMultiGPU(
-    const Aabb* boxes,
+    const AABB* boxes,
     int num_boxes,
     int num_boxes_per_thread,
     std::vector<std::pair<int, int>>& finOverlaps,
@@ -38,16 +38,16 @@ void runBroadPhaseMultiGPU(
     cudaEventCreate(&stop);
 
     // Allocate boxes to GPU
-    Aabb* d_boxes;
-    cudaMalloc((void**)&d_boxes, sizeof(Aabb) * num_boxes);
+    AABB* d_boxes;
+    cudaMalloc((void**)&d_boxes, sizeof(AABB) * num_boxes);
     cudaMemcpy(
-        d_boxes, boxes, sizeof(Aabb) * num_boxes, cudaMemcpyHostToDevice);
+        d_boxes, boxes, sizeof(AABB) * num_boxes, cudaMemcpyHostToDevice);
 
     dim3 block(threads_per_block);
     int grid_dim_1d = (num_boxes / threads_per_block + 1);
     dim3 grid(grid_dim_1d);
     logger().trace("Grid dim (1D): {:d}", grid_dim_1d);
-    logger().trace("Box size: {:d}", sizeof(Aabb));
+    logger().trace("Box size: {:d}", sizeof(AABB));
 
     // Thrust sort (can be improved by sort_by_key)
     cudaEventRecord(start);
@@ -110,9 +110,9 @@ void runBroadPhaseMultiGPU(
         logger().trace(
             "device_id: {:d} [{:d}, {:d})", device_id, range_start, range_end);
 
-        Aabb* d_b;
-        cudaMalloc((void**)&d_b, sizeof(Aabb) * num_boxes);
-        cudaMemcpy(d_b, d_boxes, sizeof(Aabb) * num_boxes, cudaMemcpyDefault);
+        AABB* d_b;
+        cudaMalloc((void**)&d_b, sizeof(AABB) * num_boxes);
+        cudaMemcpy(d_b, d_boxes, sizeof(AABB) * num_boxes, cudaMemcpyDefault);
         cudaDeviceSynchronize();
 
         cudaDeviceCanAccessPeer(&is_able, device_id, device_init_id);
@@ -186,8 +186,8 @@ void runBroadPhaseMultiGPU(
             // finOverlaps.push_back();
             int aid = overlaps[i].x;
             int bid = overlaps[i].y;
-            Aabb a = boxes[aid];
-            Aabb b = boxes[bid];
+            AABB a = boxes[aid];
+            AABB b = boxes[bid];
 
             if (is_vertex(a) && is_face(b)) // vertex, face
                 local_overlaps.emplace_back(aid, bid);

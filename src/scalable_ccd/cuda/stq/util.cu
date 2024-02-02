@@ -23,7 +23,7 @@ void setup(
 
     if (!boxes_per_thread) {
         boxes_per_thread =
-            std::max(max_shared_memory / sizeof(Aabb) / max_threads, 1ul);
+            std::max(max_shared_memory / sizeof(AABB) / max_threads, 1ul);
     }
     logger().trace("Boxes per thread: {:d}", boxes_per_thread);
 
@@ -35,7 +35,7 @@ void setup(
         logger().trace("Max threads per multiprocessor: {:d} threads", threads);
     }
     shared_memory_size =
-        HEAP_SIZE * sizeof(int2); // boxes_per_thread * threads * sizeof(Aabb);
+        HEAP_SIZE * sizeof(int2); // boxes_per_thread * threads * sizeof(AABB);
 
     if (shared_memory_size > max_shared_memory) {
         logger().error(
@@ -48,7 +48,7 @@ void setup(
     }
     // while (shared_memory_size > max_shared_memory || threads > max_threads) {
     //   // threads--;
-    //   // shared_memory_size = boxes_per_thread * threads * sizeof(Aabb);
+    //   // shared_memory_size = boxes_per_thread * threads * sizeof(AABB);
     //   shared_memory_size /= 2;
     // }
     logger().trace("Actual threads per block: {:d} threads", threads);

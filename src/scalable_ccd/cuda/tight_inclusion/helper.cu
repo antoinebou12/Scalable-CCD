@@ -32,7 +32,7 @@ template <typename T> T* copy_to_gpu(const T* cpu_data, const int size)
 
 __global__ void split_overlaps(
     const int2* const overlaps,
-    const cuda::stq::Aabb* const boxes,
+    const cuda::stq::AABB* const boxes,
     int N,
     int2* vf_overlaps,
     int2* ee_overlaps,
@@ -62,7 +62,7 @@ __global__ void split_overlaps(
 
 __global__ void addData(
     const int2* const overlaps,
-    const cuda::stq::Aabb* const boxes,
+    const cuda::stq::AABB* const boxes,
     const Scalar* const V0,
     const Scalar* const V1,
     int Vrows,
@@ -118,7 +118,7 @@ __global__ void addData(
 
 void run_narrowphase(
     int2* d_overlaps,
-    Aabb* d_boxes,
+    AABB* d_boxes,
     MemoryHandler* memory_handler,
     int count,
     Scalar* d_vertices_t0,
@@ -271,7 +271,7 @@ void run_narrowphase(
 }
 
 void run_ccd(
-    const vector<Aabb> boxes,
+    const vector<AABB> boxes,
     MemoryHandler* memory_handler,
     const Eigen::MatrixXd& vertices_t0,
     const Eigen::MatrixXd& vertices_t1,
@@ -322,7 +322,7 @@ void run_ccd(
         tot_count += count;
         spdlog::trace("Count {:d}", count);
 
-        Aabb* d_boxes = copy_to_gpu(boxes.data(), boxes.size());
+        AABB* d_boxes = copy_to_gpu(boxes.data(), boxes.size());
         r.Stop();
 
         r.Start("copyVerticesToGpu", /*gpu=*/true);
@@ -363,7 +363,7 @@ void construct_static_collision_candidates(
     const Eigen::MatrixXi& E,
     const Eigen::MatrixXi& F,
     vector<pair<int, int>>& overlaps,
-    vector<cuda::stq::Aabb>& boxes,
+    vector<cuda::stq::AABB>& boxes,
     double inflation_radius)
 {
     construct_continuous_collision_candidates(
@@ -376,7 +376,7 @@ void construct_continuous_collision_candidates(
     const Eigen::MatrixXi& E,
     const Eigen::MatrixXi& F,
     vector<pair<int, int>>& overlaps,
-    vector<cuda::stq::Aabb>& boxes,
+    vector<cuda::stq::AABB>& boxes,
     double inflation_radius)
 {
     constructBoxes(V0, V1, E, F, boxes, -1, inflation_radius);
@@ -411,7 +411,7 @@ Scalar compute_toi_strategy(
     Scalar min_distance,
     Scalar tolerance)
 {
-    vector<cuda::stq::Aabb> boxes;
+    vector<cuda::stq::AABB> boxes;
     constructBoxes(V0, V1, E, F, boxes);
     spdlog::trace("Finished constructing");
     int N = boxes.size();
@@ -449,7 +449,7 @@ Scalar compute_toi_strategy(
         spdlog::trace("Count {:d}", count);
 
         // Allocate boxes to GPU
-        Aabb* d_boxes = copy_to_gpu(boxes.data(), boxes.size());
+        AABB* d_boxes = copy_to_gpu(boxes.data(), boxes.size());
 
         spdlog::trace("Copying vertices");
         double* d_vertices_t0 = copy_to_gpu(V0.data(), V0.size());

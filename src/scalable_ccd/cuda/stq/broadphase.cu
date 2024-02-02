@@ -35,8 +35,8 @@ void BroadPhase::clear()
     num_devices = 1;
 }
 
-const thrust::device_vector<cuda::stq::Aabb>&
-BroadPhase::build(const std::vector<cuda::stq::Aabb>& boxes)
+const thrust::device_vector<cuda::stq::AABB>&
+BroadPhase::build(const std::vector<cuda::stq::AABB>& boxes)
 {
     logger().trace("Number of boxes: {:d}", boxes.size());
 

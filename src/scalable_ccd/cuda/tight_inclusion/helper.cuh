@@ -13,7 +13,7 @@ namespace scalable_ccd::cuda {
 
 __global__ void addData(
     const int2* const overlaps,
-    const cuda::stq::Aabb* const boxes,
+    const cuda::stq::AABB* const boxes,
     const Scalar* const V0,
     const Scalar* const V1,
     int Vrows,
@@ -23,7 +23,7 @@ __global__ void addData(
     int shift = 0);
 
 void run_ccd(
-    const std::vector<cuda::stq::Aabb> boxes,
+    const std::vector<cuda::stq::AABB> boxes,
     MemoryHandler* memory_handler,
     const Eigen::MatrixXd& vertices_t0,
     const Eigen::MatrixXd& vertices_t1,
@@ -41,7 +41,7 @@ void run_ccd(
 
 void run_narrowphase(
     int2* d_overlaps,
-    cuda::stq::Aabb* d_boxes,
+    cuda::stq::AABB* d_boxes,
     MemoryHandler* memory_handler,
     int count,
     Scalar* d_vertices_t0,
@@ -61,7 +61,7 @@ void construct_static_collision_candidates(
     const Eigen::MatrixXi& E,
     const Eigen::MatrixXi& F,
     std::vector<std::pair<int, int>>& overlaps,
-    std::vector<cuda::stq::Aabb>& boxes,
+    std::vector<cuda::stq::AABB>& boxes,
     double inflation_radius = 0);
 
 void construct_continuous_collision_candidates(
@@ -70,7 +70,7 @@ void construct_continuous_collision_candidates(
     const Eigen::MatrixXi& E,
     const Eigen::MatrixXi& F,
     std::vector<std::pair<int, int>>& overlaps,
-    std::vector<cuda::stq::Aabb>& boxes,
+    std::vector<cuda::stq::AABB>& boxes,
     double inflation_radius = 0);
 
 Scalar compute_toi_strategy(

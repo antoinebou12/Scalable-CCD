@@ -22,22 +22,22 @@ public:
 
     void clear();
 
-    const thrust::device_vector<cuda::stq::Aabb>& build(
+    const thrust::device_vector<cuda::stq::AABB>& build(
         const Eigen::MatrixXd& V,
         const Eigen::MatrixXi& E,
         const Eigen::MatrixXi& F,
-        std::vector<Aabb>& boxes,
+        std::vector<AABB>& boxes,
         double inflation_radius = 0)
     {
         return build(V, V, E, F, boxes, inflation_radius);
     }
 
-    const thrust::device_vector<cuda::stq::Aabb>& build(
+    const thrust::device_vector<cuda::stq::AABB>& build(
         const Eigen::MatrixXd& V0,
         const Eigen::MatrixXd& V1,
         const Eigen::MatrixXi& E,
         const Eigen::MatrixXi& F,
-        std::vector<Aabb>& boxes,
+        std::vector<AABB>& boxes,
         double inflation_radius = 0)
     {
         constructBoxes(V0, V1, E, F, boxes, -1, inflation_radius);
@@ -47,8 +47,8 @@ public:
     /// @brief Build the broad phase data structure.
     /// @param boxes Vector of AABBs
     /// @return A reference to the boxes stored on the GPU
-    const thrust::device_vector<cuda::stq::Aabb>&
-    build(const std::vector<cuda::stq::Aabb>& boxes);
+    const thrust::device_vector<cuda::stq::AABB>&
+    build(const std::vector<cuda::stq::AABB>& boxes);
 
     /// @brief Run the STQ broad phase algorithm on the GPU.
     /// This function is called multiple times until all boxes are processed.
@@ -65,7 +65,7 @@ public:
     bool is_complete() const { return start_thread_id >= d_boxes.size(); }
 
     /// @brief Get the boxes stored on the GPU.
-    const thrust::device_vector<cuda::stq::Aabb>& boxes() { return d_boxes; }
+    const thrust::device_vector<cuda::stq::AABB>& boxes() { return d_boxes; }
 
     /// @brief Get the resulting overlaps stored on the GPU.
     const thrust::device_vector<int2>& overlaps() { return d_overlaps; }
@@ -77,7 +77,7 @@ private:
 
     std::shared_ptr<MemoryHandler> memory_handler;
 
-    thrust::device_vector<cuda::stq::Aabb> d_boxes;
+    thrust::device_vector<cuda::stq::AABB> d_boxes;
     thrust::device_vector<Scalar2> d_sm;
     thrust::device_vector<MiniBox> d_mini;
 

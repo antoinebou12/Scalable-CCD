@@ -8,7 +8,7 @@ namespace scalable_ccd::cuda::stq {
 /// @param a Fist box
 /// @param b Second box
 /// @return True if a and b overlap.
-__device__ bool does_collide(const Aabb& a, const Aabb& b);
+__device__ bool does_collide(const AABB& a, const AABB& b);
 
 /// @brief Check if boxes a and b overlap.
 /// @param a Fist box

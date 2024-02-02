@@ -8,7 +8,7 @@
 namespace scalable_ccd::cuda::stq {
 
 void runBroadPhaseMultiGPU(
-    const std::vector<Aabb>& boxes,
+    const std::vector<AABB>& boxes,
     int N,
     int nbox,
     std::vector<std::pair<int, int>>& overlaps,

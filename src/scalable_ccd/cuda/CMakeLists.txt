@@ -1,6 +1,6 @@
 set(SOURCES
-  ipc_ccd_strategy.cpp
-  ipc_ccd_strategy.hpp
+  # ipc_ccd_strategy.cpp
+  # ipc_ccd_strategy.hpp
   memory_handler.cuh
   scalar.cu
   scalar.cuh
@@ -15,5 +15,5 @@ target_sources(scalable_ccd PRIVATE ${SOURCES})
 ################################################################################
 
 add_subdirectory(stq)
-add_subdirectory(tight_inclusion)
+# add_subdirectory(tight_inclusion)
 add_subdirectory(utils)
