@@ -3,7 +3,7 @@
 #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 /// @brief Check if boxes a and b overlap.
 /// @param a Fist box
@@ -51,4 +51,4 @@ __device__ void add_overlap(
     RawDeviceBuffer<int2>& overlaps,
     int& real_count);
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

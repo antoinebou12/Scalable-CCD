@@ -9,7 +9,7 @@
 #include <vector>
 #include <utility>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 class BroadPhase {
 public:
@@ -22,7 +22,7 @@ public:
 
     void clear();
 
-    const thrust::device_vector<cuda::stq::AABB>& build(
+    const thrust::device_vector<AABB>& build(
         const Eigen::MatrixXd& V,
         const Eigen::MatrixXi& E,
         const Eigen::MatrixXi& F,
@@ -32,7 +32,7 @@ public:
         return build(V, V, E, F, boxes, inflation_radius);
     }
 
-    const thrust::device_vector<cuda::stq::AABB>& build(
+    const thrust::device_vector<AABB>& build(
         const Eigen::MatrixXd& V0,
         const Eigen::MatrixXd& V1,
         const Eigen::MatrixXi& E,
@@ -47,8 +47,7 @@ public:
     /// @brief Build the broad phase data structure.
     /// @param boxes Vector of AABBs
     /// @return A reference to the boxes stored on the GPU
-    const thrust::device_vector<cuda::stq::AABB>&
-    build(const std::vector<cuda::stq::AABB>& boxes);
+    const thrust::device_vector<AABB>& build(const std::vector<AABB>& boxes);
 
     /// @brief Run the STQ broad phase algorithm on the GPU.
     /// This function is called multiple times until all boxes are processed.
@@ -65,7 +64,7 @@ public:
     bool is_complete() const { return thread_start_box_id >= d_boxes.size(); }
 
     /// @brief Get the boxes stored on the GPU (unsorted).
-    const thrust::device_vector<cuda::stq::AABB>& boxes() { return d_boxes; }
+    const thrust::device_vector<AABB>& boxes() { return d_boxes; }
 
     /// @brief Get the number of boxes stored on the GPU.
     size_t num_boxes() const { return d_boxes.size(); }
@@ -80,7 +79,7 @@ private:
 
     std::shared_ptr<MemoryHandler> memory_handler;
 
-    thrust::device_vector<cuda::stq::AABB> d_boxes;
+    thrust::device_vector<AABB> d_boxes;
     thrust::device_vector<Scalar2> d_sm;
     thrust::device_vector<MiniBox> d_mini;
 
@@ -97,4 +96,4 @@ private:
     int smemSize;
 };
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

@@ -13,7 +13,7 @@
 
 #define SCALABLE_CCD_USE_CUDA_SAP // for comparison with SAP
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 void BroadPhase::clear()
 {
@@ -37,8 +37,8 @@ void BroadPhase::clear()
     num_devices = 1;
 }
 
-const thrust::device_vector<cuda::stq::AABB>&
-BroadPhase::build(const std::vector<cuda::stq::AABB>& boxes)
+const thrust::device_vector<AABB>&
+BroadPhase::build(const std::vector<AABB>& boxes)
 {
     logger().debug("Broad-phase: building (# boxes: {:d})", boxes.size());
 
@@ -228,4 +228,4 @@ Dimension BroadPhase::calc_sort_dimension() const
     return axis;
 }
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

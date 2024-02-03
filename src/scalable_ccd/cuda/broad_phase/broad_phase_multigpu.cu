@@ -10,7 +10,7 @@
 
 #include <tbb/parallel_for.h>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 void runBroadPhaseMultiGPU(
     const AABB* boxes,
@@ -218,4 +218,4 @@ void runBroadPhaseMultiGPU(
     printf("\n");
 }
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

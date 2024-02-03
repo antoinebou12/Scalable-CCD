@@ -1019,7 +1019,7 @@ bool run_memory_pool_ccd(
     // std::vector<std::pair<std::string, std::string>> symbolic_tois;
     int tpq_cnt = 0;
     for (size_t i = 0; i < d_data_list.size(); i++) {
-        cuda::stq::Rational ra(data_list[i].toi);
+        cuda::Rational ra(data_list[i].toi);
         if (data_list[i].toi > 1)
             continue;
         tpq_cnt++;

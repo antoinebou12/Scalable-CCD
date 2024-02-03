@@ -1,7 +1,7 @@
 #include <scalable_ccd/cuda/broad_phase/queue.cuh>
 #include <iostream>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 __device__ int2 Queue::pop()
 {
@@ -24,4 +24,4 @@ __device__ bool Queue::push(const int2 pair)
     return false;
 }
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

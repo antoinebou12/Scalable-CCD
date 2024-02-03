@@ -2,7 +2,7 @@
 
 // #include <cuda/semaphore>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 static constexpr int HEAP_SIZE = 64;
 
@@ -57,4 +57,4 @@ public:
     // unsigned push_cnt;
 };
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

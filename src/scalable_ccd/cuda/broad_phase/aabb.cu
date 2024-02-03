@@ -9,7 +9,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/global_control.h>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 AABB::AABB(const Scalar3& _min, const Scalar3& _max) : min(_min), max(_max)
 {
@@ -154,4 +154,4 @@ void constructBoxes(
     build_face_boxes(faces, vertices_t0.rows() + edges.rows(), boxes);
 }
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

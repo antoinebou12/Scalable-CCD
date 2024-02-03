@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 class AABB {
 public:
@@ -117,4 +117,4 @@ void constructBoxes(
     std::vector<AABB>& boxes,
     Scalar inflation_radius = 0);
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

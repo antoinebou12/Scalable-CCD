@@ -39,7 +39,7 @@ int main(int argc, char** argv)
     else
         filet1 = argv[1];
 
-    std::vector<scalable_ccd::cuda::stq::AABB> boxes;
+    std::vector<scalable_ccd::cuda::AABB> boxes;
     Eigen::MatrixXd vertices_t0;
     Eigen::MatrixXd vertices_t1;
     Eigen::MatrixXd pca_vertices_t0;

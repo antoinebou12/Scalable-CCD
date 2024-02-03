@@ -4,7 +4,7 @@
 #include <scalable_ccd/cuda/broad_phase/queue.cuh>
 #include <scalable_ccd/utils/logger.hpp>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 void setup(
     int device_id, int& shared_memory_size, int& threads, int& boxes_per_thread)
@@ -98,4 +98,4 @@ void dispatch(
     dispatch(tag, gs, bs, mem, f, args...);
 }
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

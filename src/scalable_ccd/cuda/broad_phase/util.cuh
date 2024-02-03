@@ -2,7 +2,7 @@
 
 #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 struct sort_aabb_x {
     __device__ bool operator()(const AABB& a, const AABB& b) const
@@ -27,4 +27,4 @@ void setup(
     int& threads,
     int& boxes_per_thread);
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

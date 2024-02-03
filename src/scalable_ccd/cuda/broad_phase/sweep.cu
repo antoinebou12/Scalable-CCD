@@ -5,7 +5,7 @@
 #include <scalable_ccd/cuda/broad_phase/sweep.cuh>
 #include <scalable_ccd/utils/logger.hpp>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 __global__ void retrieve_collision_pairs(
     const AABB* const boxes,
@@ -239,4 +239,4 @@ __global__ void runSTQ(
     }
 }
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

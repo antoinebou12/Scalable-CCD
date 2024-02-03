@@ -28,7 +28,7 @@ namespace scalable_ccd::cuda {
 /// @param min_distance
 /// @return
 // double run_ccd(
-//     const std::vector<cuda::stq::AABB> boxes,
+//     const std::vector<AABB> boxes,
 //     std::shared_ptr<MemoryHandler> memory_handler,
 //     const Eigen::MatrixXd& vertices_t0,
 //     const Eigen::MatrixXd& vertices_t1,
@@ -60,7 +60,7 @@ namespace scalable_ccd::cuda {
 void run_narrow_phase(
     const DeviceMatrix<Scalar>& d_vertices_t0,
     const DeviceMatrix<Scalar>& d_vertices_t1,
-    const thrust::device_vector<stq::AABB>& d_boxes,
+    const thrust::device_vector<AABB>& d_boxes,
     const thrust::device_vector<int2>& d_overlaps,
     const int threads,
     const int max_iter,

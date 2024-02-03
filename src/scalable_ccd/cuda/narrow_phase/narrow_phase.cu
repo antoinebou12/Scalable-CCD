@@ -14,8 +14,6 @@
 
 namespace scalable_ccd::cuda {
 
-using namespace stq;
-
 namespace {
 
     /// @brief Split the heterogeneous list of overlaps into two lists of vertex-face and edge-edge overlaps.
@@ -57,7 +55,7 @@ namespace {
         const Scalar* const V0,
         const Scalar* const V1,
         const int n_vertices,
-        const cuda::stq::AABB* const boxes,
+        const AABB* const boxes,
         const RawDeviceBuffer<int2> overlaps,
         const Scalar ms,
         CCDData* data)
@@ -112,7 +110,7 @@ namespace {
 void run_narrow_phase(
     const DeviceMatrix<Scalar>& d_vertices_t0,
     const DeviceMatrix<Scalar>& d_vertices_t1,
-    const thrust::device_vector<stq::AABB>& d_boxes,
+    const thrust::device_vector<AABB>& d_boxes,
     const thrust::device_vector<int2>& d_overlaps,
     const int threads,
     const int max_iter,
@@ -252,7 +250,7 @@ void run_narrow_phase(
 
 #if false
 void run_ccd(
-    const std::vector<cuda::stq::AABB>& boxes,
+    const std::vector<AABB>& boxes,
     std::shared_ptr<MemoryHandler> memory_handler,
     const Eigen::MatrixXd& _vertices_t0,
     const Eigen::MatrixXd& _vertices_t1,

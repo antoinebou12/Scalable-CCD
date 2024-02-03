@@ -5,7 +5,7 @@
 #include <vector>
 #include <utility>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 void runBroadPhaseMultiGPU(
     const std::vector<AABB>& boxes,
@@ -15,4 +15,4 @@ void runBroadPhaseMultiGPU(
     int& threads,
     int& devcount);
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

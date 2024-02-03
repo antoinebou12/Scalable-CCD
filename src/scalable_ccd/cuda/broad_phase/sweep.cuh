@@ -5,7 +5,7 @@
 #include <scalable_ccd/cuda/broad_phase/collision.cuh>
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 /// @brief
 /// @param boxes
@@ -89,4 +89,4 @@ __global__ void runSAP(
     RawDeviceBuffer<int2> overlaps,
     MemoryHandler* memory_handler);
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

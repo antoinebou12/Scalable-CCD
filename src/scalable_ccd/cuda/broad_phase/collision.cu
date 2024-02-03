@@ -1,6 +1,6 @@
 #include <scalable_ccd/cuda/broad_phase/collision.cuh>
 
-namespace scalable_ccd::cuda::stq {
+namespace scalable_ccd::cuda {
 
 __device__ bool does_collide(const AABB& a, const AABB& b)
 {
@@ -48,4 +48,4 @@ __device__ void add_overlap(
     }
 }
 
-} // namespace scalable_ccd::cuda::stq
+} // namespace scalable_ccd::cuda

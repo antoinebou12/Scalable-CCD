@@ -7,8 +7,6 @@
 
 namespace scalable_ccd::cuda {
 
-using namespace stq;
-
 double ipc_ccd_strategy(
     const Eigen::MatrixXd& _V0,
     const Eigen::MatrixXd& _V1,
