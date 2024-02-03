@@ -1,10 +1,10 @@
 set(SOURCES
     aabb.cu
     aabb.cuh
-    broadphase_multigpu.cu
-    broadphase_multigpu.cuh
-    broadphase.cu
-    broadphase.cuh
+    broad_phase_multigpu.cu
+    broad_phase_multigpu.cuh
+    broad_phase.cu
+    broad_phase.cuh
     collision.cu
     collision.cuh
     queue.cu

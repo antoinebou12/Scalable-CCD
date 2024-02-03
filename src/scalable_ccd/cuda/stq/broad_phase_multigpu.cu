@@ -1,4 +1,4 @@
-#include "broadphase.cuh"
+#include "broad_phase.cuh"
 
 #include <scalable_ccd/config.hpp>
 #include <scalable_ccd/utils/merge_local_overlaps.hpp>

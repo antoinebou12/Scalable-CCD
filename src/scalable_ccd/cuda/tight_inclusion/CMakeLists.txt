@@ -1,6 +1,6 @@
 set(SOURCES
-    helper.cu
-    helper.cuh
+    narrow_phase.cu
+    narrow_phase.cuh
     root_finder.cu
     root_finder.cuh
 )

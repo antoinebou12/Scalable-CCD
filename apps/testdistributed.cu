@@ -1,4 +1,4 @@
-#include <stq/gpu/broadphase.cuh>
+#include <stq/gpu/broad_phase.cuh>
 #include <stq/gpu/groundtruth.h>
 #include <stq/gpu/util.cuh>
 

@@ -1,4 +1,4 @@
-#include "helper.cuh"
+#include "narrow_phase.cuh"
 
 #include <scalable_ccd/config.hpp>
 
