@@ -1,5 +1,6 @@
 # Detects whether this is a top-level project
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
+
 if(HAS_PARENT)
   set(SCALABLE_CCD_TOPLEVEL_PROJECT OFF)
 else()
@@ -8,6 +9,7 @@ endif()
 
 # Check required CMake version
 set(REQUIRED_CMAKE_VERSION "3.18.0")
+
 if(SCALABLE_CCD_TOPLEVEL_PROJECT)
   cmake_minimum_required(VERSION ${REQUIRED_CMAKE_VERSION})
 else()
@@ -26,17 +28,20 @@ endif()
 
 # Enable ccache if available
 find_program(CCACHE_PROGRAM ccache)
+
 if(CCACHE_PROGRAM)
   option(SCALABLE_CCD_WITH_CCACHE "Enable ccache when building Scalable CCD" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
 else()
   option(SCALABLE_CCD_WITH_CCACHE "Enable ccache when building Scalable CCD" OFF)
 endif()
+
 if(SCALABLE_CCD_WITH_CCACHE AND CCACHE_PROGRAM)
   message(STATUS "Enabling Ccache support (${CCACHE_PROGRAM})")
   set(ccacheEnv
     CCACHE_BASEDIR=${CMAKE_BINARY_DIR}
     CCACHE_SLOPPINESS=clang_index_store,include_file_ctime,include_file_mtime,locale,pch_defines,time_macros
   )
+
   foreach(lang IN ITEMS C CXX)
     set(CMAKE_${lang}_COMPILER_LAUNCHER
       ${CMAKE_COMMAND} -E env ${ccacheEnv} ${CCACHE_PROGRAM}
@@ -44,28 +49,27 @@ if(SCALABLE_CCD_WITH_CCACHE AND CCACHE_PROGRAM)
   endforeach()
 endif()
 
-################################################################################
+# ==============================================================================
 # CMake Policies
-################################################################################
-
+# ==============================================================================
 cmake_policy(SET CMP0054 NEW) # Only interpret if() arguments as variables or keywords when unquoted.
 cmake_policy(SET CMP0076 NEW) # target_sources() command converts relative paths to absolute.
+
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
   cmake_policy(SET CMP0135 NEW) # Set the timestamps of all extracted contents to the time of the extraction.
 endif()
 
-################################################################################
-
+# ==============================================================================
 project(ScalableCCD
-        DESCRIPTION "Sweep and Tiniest Queue & Tight-Inclusion GPU CCD"
-        LANGUAGES CXX
-        VERSION "0.1.0")
+  DESCRIPTION "Sweep and Tiniest Queue & Tight-Inclusion GPU CCD"
+  LANGUAGES CXX
+  VERSION "0.1.0")
 
-option(SCALABLE_CCD_WITH_CUDA     "Enable CUDA CCD"                                       OFF)
-OPTION(SCALABLE_CCD_USE_DOUBLE    "Use double precision calculation"                       ON)
-OPTION(SCALABLE_CCD_TOI_PER_QUERY "Output time of impact per query in JSON"               OFF)
-option(SCALABLE_CCD_BUILD_TESTS   "Build Scalable CCD tests" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
-OPTION(SCALABLE_CCD_WITH_PROFILER "Enable profiler"          ${SCALABLE_CCD_TOPLEVEL_PROJECT})
+option(SCALABLE_CCD_WITH_CUDA "Enable CUDA CCD" OFF)
+OPTION(SCALABLE_CCD_USE_DOUBLE "Use double precision calculation" ON)
+OPTION(SCALABLE_CCD_TOI_PER_QUERY "Output time of impact per query in JSON" OFF)
+option(SCALABLE_CCD_BUILD_TESTS "Build Scalable CCD tests" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
+OPTION(SCALABLE_CCD_WITH_PROFILER "Enable profiler" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
 
 # Set default minimum C++ standard
 if(SCALABLE_CCD_TOPLEVEL_PROJECT)
@@ -74,7 +78,7 @@ if(SCALABLE_CCD_TOPLEVEL_PROJECT)
   set(CMAKE_CXX_EXTENSIONS OFF)
 endif()
 
-### Configuration
+# Configuration
 set(SCALABLE_CCD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/scalable_ccd")
 set(SCALABLE_CCD_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/src")
 
@@ -89,9 +93,9 @@ include(scalable_ccd_use_colors)
 # Generate position-independent code by default
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-################################################################################
+# ==============================================================================
 # Scalable CCD Library
-################################################################################
+# ==============================================================================
 
 # Add an empty library and fill in the list of sources in `src/scalable_ccd/CMakeLists.txt`.
 add_library(scalable_ccd)
@@ -108,16 +112,16 @@ add_subdirectory("${SCALABLE_CCD_SOURCE_DIR}")
 # Public include directory for Scalable CCD
 target_include_directories(scalable_ccd PUBLIC "${SCALABLE_CCD_INCLUDE_DIR}")
 
-################################################################################
+# ==============================================================================
 # Optional Definitions
-################################################################################
+# ==============================================================================
 
 # For MSVC, do not use the min and max macros.
 target_compile_definitions(scalable_ccd PUBLIC NOMINMAX)
 
-################################################################################
+# ==============================================================================
 # Dependencies
-################################################################################
+# ==============================================================================
 
 # Eigen
 include(eigen)
@@ -147,20 +151,20 @@ endif()
 include(scalable_ccd_warnings)
 target_link_libraries(scalable_ccd PRIVATE scalable_ccd::warnings)
 
-################################################################################
+# ==============================================================================
 # Compiler options
-################################################################################
+# ==============================================================================
 
 # Use C++17
 target_compile_features(scalable_ccd PUBLIC cxx_std_17)
 
-################################################################################
+# ==============================================================================
 # CUDA
-################################################################################
-
+# ==============================================================================
 if(SCALABLE_CCD_WITH_CUDA)
   include(CheckLanguage)
   check_language(CUDA)
+
   if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
   else()
@@ -182,14 +186,15 @@ if(SCALABLE_CCD_WITH_CUDA)
     string(REPLACE "." "" CUDA_ARCH_LIST "${CUDA_ARCH_LIST}")
     set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
   endif()
+
   set_target_properties(scalable_ccd PROPERTIES CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
 
   if(APPLE)
     # We need to add the path to the driver (libcuda.dylib) as an rpath,
     # so that the static cuda runtime can find it at runtime.
     set_property(TARGET scalable_ccd
-                 PROPERTY
-                 BUILD_RPATH ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+      PROPERTY
+      BUILD_RPATH ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
   endif()
 
   target_compile_options(scalable_ccd PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
@@ -200,15 +205,15 @@ if(SCALABLE_CCD_WITH_CUDA)
     # --ptxas-options=-v
     # --maxrregcount=7
     -fPIC # https://stackoverflow.com/questions/5311515/gcc-fpic-option
-  >)
+    >)
 
   find_package(CUDAToolkit)
   target_link_libraries(scalable_ccd PUBLIC CUDA::cudart)
 endif()
 
-################################################################################
+# ==============================================================================
 # Tests
-################################################################################
+# ==============================================================================
 
 # Enable unit testing at the root level
 if(SCALABLE_CCD_TOPLEVEL_PROJECT AND SCALABLE_CCD_BUILD_TESTS)
@@ -217,9 +222,9 @@ if(SCALABLE_CCD_TOPLEVEL_PROJECT AND SCALABLE_CCD_BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-################################################################################
+# ==============================================================================
 # Binary
-################################################################################
+# ==============================================================================
 if(SCALABLE_CCD_TOPLEVEL_PROJECT)
   add_subdirectory(apps)
 endif()
