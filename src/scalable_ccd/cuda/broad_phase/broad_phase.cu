@@ -2,8 +2,8 @@
 
 #include <scalable_ccd/config.hpp>
 #include <scalable_ccd/cuda/broad_phase/sweep.cuh>
-#include <scalable_ccd/cuda/broad_phase/util.cuh>
-#include <scalable_ccd/cuda/utils/profiler.hpp>
+#include <scalable_ccd/cuda/broad_phase/utils.cuh>
+#include <scalable_ccd/utils/profiler.hpp>
 #include <scalable_ccd/cuda/utils/device_variable.cuh>
 
 #include <thrust/execution_policy.h>
@@ -194,7 +194,7 @@ Dimension BroadPhase::calc_sort_dimension() const
 {
     // mean of all box points (used to find best axis)
     thrust::device_vector<Scalar3> d_mean(1, make_Scalar3(0, 0, 0));
-    calc_mean<<<grid_dim_1d(), threads_per_block, smemSize>>>(
+    calc_mean<<<grid_dim_1d(), threads_per_block>>>(
         thrust::raw_pointer_cast(d_boxes.data()), d_boxes.size(),
         thrust::raw_pointer_cast(d_mean.data()));
 
@@ -205,7 +205,7 @@ Dimension BroadPhase::calc_sort_dimension() const
     // calculate variance and determine which axis to sort on
     DeviceVariable<Scalar3> d_variance(make_Scalar3(0, 0, 0));
 
-    calc_variance<<<grid_dim_1d(), threads_per_block, smemSize>>>(
+    calc_variance<<<grid_dim_1d(), threads_per_block>>>(
         thrust::raw_pointer_cast(d_boxes.data()), d_boxes.size(),
         thrust::raw_pointer_cast(d_mean.data()), &d_variance);
     cudaDeviceSynchronize();

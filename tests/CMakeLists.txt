@@ -6,6 +6,12 @@ add_executable(scalable_ccd_tests
   test_cuda_stq.cpp
 )
 
+# if(SCALABLE_CCD_WITH_CUDA)
+# target_sources(scalable_ccd_tests PRIVATE
+# test_producer_consumer.cu
+# )
+# endif()
+
 # ==============================================================================
 # Required Libraries
 # ==============================================================================

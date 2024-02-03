@@ -4,7 +4,7 @@
 #include <scalable_ccd/cuda/types.cuh>
 #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/cuda/utils/device_matrix.cuh>
-#include <scalable_ccd/cuda/utils/profiler.hpp>
+#include <scalable_ccd/utils/profiler.hpp>
 #include <scalable_ccd/utils/logger.hpp>
 
 #include <thrust/device_vector.h>

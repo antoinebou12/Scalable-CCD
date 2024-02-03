@@ -1,6 +1,6 @@
 #include <stq/gpu/broad_phase.cuh>
 #include <stq/gpu/groundtruth.h>
-#include <stq/gpu/util.cuh>
+#include <stq/gpu/utils.cuh>
 
 #include <vector>
 #include <iostream>

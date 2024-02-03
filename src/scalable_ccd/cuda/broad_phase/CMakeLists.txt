@@ -11,8 +11,8 @@ set(SOURCES
     queue.cuh
     sweep.cu
     sweep.cuh
-    util.cu
-    util.cuh
+    utils.cu
+    utils.cuh
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" FILES ${SOURCES})

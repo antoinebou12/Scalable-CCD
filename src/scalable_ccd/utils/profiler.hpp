@@ -15,7 +15,7 @@
 #define SCALABLE_CCD_GPU_PROFILE_POINT(...)                                    \
     scalable_ccd::GPUProfilePoint __scalable_ccd_profile_point(__VA_ARGS__)
 
-namespace scalable_ccd::cuda {
+namespace scalable_ccd {
 
 class Profiler {
 public:
@@ -91,7 +91,7 @@ protected:
 using CPUProfilePoint = ProfilePoint<scalable_ccd::Timer, false>;
 using GPUProfilePoint = ProfilePoint<scalable_ccd::cuda::Timer, true>;
 
-} // namespace scalable_ccd::cuda
+} // namespace scalable_ccd
 
 #else
 

@@ -4,8 +4,6 @@ set(SOURCES
   device_matrix.cuh
   device_variable.cuh
   limits.cuh
-  profiler.cpp
-  profiler.hpp
   timer.cuh
 )
 

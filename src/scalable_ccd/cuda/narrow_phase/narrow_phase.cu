@@ -9,7 +9,7 @@
 #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/cuda/utils/device_variable.cuh>
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
-#include <scalable_ccd/cuda/utils/profiler.hpp>
+#include <scalable_ccd/utils/profiler.hpp>
 #include <scalable_ccd/utils/logger.hpp>
 
 namespace scalable_ccd::cuda {

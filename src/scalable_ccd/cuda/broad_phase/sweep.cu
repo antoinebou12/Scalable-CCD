@@ -7,55 +7,6 @@
 
 namespace scalable_ccd::cuda {
 
-__global__ void retrieve_collision_pairs(
-    const AABB* const boxes,
-    int* count,
-    int2* overlaps,
-    int num_boxes,
-    int guess,
-    int nbox,
-    int start,
-    int end)
-{
-    extern __shared__ AABB s_objects[];
-    int tid = start + threadIdx.x + blockIdx.x * blockDim.x;
-    int ltid = threadIdx.x;
-
-    if (tid >= num_boxes || tid >= end)
-        return;
-    s_objects[ltid] = boxes[tid];
-
-    __syncthreads();
-
-    int t = tid + 0 * blockDim.x;
-    int l = 0 * blockDim.x + ltid;
-
-    int ntid = t + 1;
-    int nltid = l + 1;
-
-    if (ntid >= num_boxes)
-        return;
-
-    const AABB& a = s_objects[l];
-    AABB b = nltid < blockDim.x ? s_objects[nltid] : boxes[ntid];
-    int i = 0;
-    while (a.max.x >= b.min.x) // boxes can touch and collide
-    {
-        i++;
-        if (does_collide(a, b) && !covertex(a.vertex_ids, b.vertex_ids)) {
-            add_overlap(a.box_id, b.box_id, guess, overlaps, count);
-        }
-
-        ntid++;
-        nltid++;
-        if (ntid >= num_boxes)
-            return;
-        b = nltid < blockDim.x ? s_objects[nltid] : boxes[ntid];
-    }
-    if (tid == 0)
-        printf("final count for box 0: %i\n", i);
-}
-
 __global__ void
 calc_mean(const AABB* const boxes, const int num_boxes, Scalar3* mean)
 {
@@ -92,6 +43,8 @@ __global__ void calc_variance(
     atomicAdd(&var[0].z, fx.z);
 }
 
+// -----------------------------------------------------------------------------
+
 __global__ void splitBoxes(
     const AABB* const boxes,
     Scalar2* sortedmin,
@@ -123,6 +76,8 @@ __global__ void splitBoxes(
 
     mini[tid] = MiniBox(min, max, boxes[tid].vertex_ids, tid);
 }
+
+// -----------------------------------------------------------------------------
 
 __global__ void runSAP(
     const Scalar2* const sortedMajorAxis,
@@ -180,8 +135,7 @@ __global__ void runSTQ(
     MemoryHandler* memory_handler)
 {
     // Initialize shared queue for threads to push collisions onto
-    __shared__ Queue queue; // WARNING: This results in a compiler warning
-    queue.heap_size = HEAP_SIZE;
+    __shared__ Queue queue;
     queue.start = 0;
     queue.end = 0;
 
@@ -197,10 +151,11 @@ __global__ void runSTQ(
     Scalar a_max = sortedMajorAxis[box_id].y;
     Scalar b_min = sortedMajorAxis[box_id + 1].x;
 
-    // check if box_id and box_id+1 boxes collide on major axis
-    // if they do, push them onto the queue.
+    // If box_id and box_id+1 boxes collide on major axis, then push them onto
+    // the queue.
     if (a_max >= b_min) {
-        queue.push(make_int2(box_id, box_id + 1));
+        const bool success = queue.push(make_int2(box_id, box_id + 1));
+        assert(success);
     }
     __syncthreads();
     queue.nbr_per_loop = queue.end - queue.start;
@@ -235,8 +190,59 @@ __global__ void runSTQ(
         }
         __syncthreads();
         // Update the number of boxes to be processed in the queue
-        queue.nbr_per_loop = (queue.end - queue.start + HEAP_SIZE) % HEAP_SIZE;
+        queue.nbr_per_loop = (queue.end - queue.start + QUEUE_SIZE) % QUEUE_SIZE;
     }
+}
+
+// -----------------------------------------------------------------------------
+
+__global__ void retrieve_collision_pairs(
+    const AABB* const boxes,
+    int* count,
+    int2* overlaps,
+    int num_boxes,
+    int guess,
+    int nbox,
+    int start,
+    int end)
+{
+    extern __shared__ AABB s_objects[];
+    int tid = start + threadIdx.x + blockIdx.x * blockDim.x;
+    int ltid = threadIdx.x;
+
+    if (tid >= num_boxes || tid >= end)
+        return;
+    s_objects[ltid] = boxes[tid];
+
+    __syncthreads();
+
+    int t = tid + 0 * blockDim.x;
+    int l = 0 * blockDim.x + ltid;
+
+    int ntid = t + 1;
+    int nltid = l + 1;
+
+    if (ntid >= num_boxes)
+        return;
+
+    const AABB& a = s_objects[l];
+    AABB b = nltid < blockDim.x ? s_objects[nltid] : boxes[ntid];
+    int i = 0;
+    while (a.max.x >= b.min.x) // boxes can touch and collide
+    {
+        i++;
+        if (does_collide(a, b) && !covertex(a.vertex_ids, b.vertex_ids)) {
+            add_overlap(a.box_id, b.box_id, guess, overlaps, count);
+        }
+
+        ntid++;
+        nltid++;
+        if (ntid >= num_boxes)
+            return;
+        b = nltid < blockDim.x ? s_objects[nltid] : boxes[ntid];
+    }
+    if (tid == 0)
+        printf("final count for box 0: %i\n", i);
 }
 
 } // namespace scalable_ccd::cuda

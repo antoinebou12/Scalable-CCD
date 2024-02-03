@@ -5,6 +5,8 @@ set(SOURCES
   merge_local_overlaps.hpp
   pca.cpp
   pca.hpp
+  profiler.cpp
+  profiler.hpp
   timer.hpp
 )
 

@@ -1,41 +1,42 @@
-#include <vector>
-#include <iostream>
-#include <bitset>
-#include <string>
-#include <numeric>
-#include <string>
-#include <functional>
-#include <cuda/pipeline>
-#include <cuda/semaphore>
+// #include <vector>
+// #include <iostream>
+// #include <bitset>
+// #include <string>
+// #include <numeric>
+// #include <string>
+// #include <functional>
+// #include <cuda/pipeline>
+// #include <cuda/semaphore>
 
-// need this to get tiled_partition > 32 threads
-#define _CG_ABI_EXPERIMENTAL // enable experimental API
+// // need this to get tiled_partition > 32 threads
+// #define _CG_ABI_EXPERIMENTAL // enable experimental API
 
-#include <cooperative_groups.h>
+// #include <cooperative_groups.h>
 
-#include <curand.h>
-#include <curand_kernel.h>
+// #include <curand.h>
+// #include <curand_kernel.h>
 
-#include <stq/gpu/queue.cuh>
-#include <stq/gpu/aabb.cuh>
-#include <stq/gpu/timer.cuh>
-#include <stq/gpu/util.cuh>
+// #include <stq/gpu/queue.cuh>
+// #include <stq/gpu/aabb.cuh>
+// #include <stq/gpu/timer.cuh>
+// #include <stq/gpu/utils.cuh>
 
-using namespace std;
 // using namespace cooperative_groups;
-namespace cg = cooperative_groups;
-typedef long long int ll;
+// namespace cg = cooperative_groups;
 
-__global__ void run(ll* in, ll* out, int N)
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+
+__global__ void run(long* in, long* out, int N)
 {
     __shared__ cuda::pipeline_shared_state<cuda::thread_scope_block, 2> pss;
     __shared__ Queue queue;
-    queue.capacity = HEAP_SIZE;
-    queue.heap_size = HEAP_SIZE;
-    for (int i = threadIdx.x; i < HEAP_SIZE; i += blockDim.x) {
+    queue.capacity = QUEUE_SIZE;
+    queue.heap_size = QUEUE_SIZE;
+    for (int i = threadIdx.x; i < QUEUE_SIZE; i += blockDim.x) {
         queue.lock[i].release();
-        queue.harr[i].x = -1.0; // release to add
-                                // printf("Lock %i released\n", i);
+        queue.storage[i].x = -1.0; // release to add
+                                   // printf("Lock %i released\n", i);
     }
     __syncthreads();
 
@@ -71,8 +72,8 @@ __global__ void run(ll* in, ll* out, int N)
         curr1 = queue.push(lanerel, val1);
         curr2 = queue.push(lanerel, val2);
     } else {
-        int2 res1 = queue.pop(lanerel % HEAP_SIZE);
-        // int2 res2 = queue.pop(lanerel % HEAP_SIZE);
+        int2 res1 = queue.pop(lanerel % QUEUE_SIZE);
+        // int2 res2 = queue.pop(lanerel % QUEUE_SIZE);
         out[tid] = res1.x;
     }
 
@@ -91,31 +92,23 @@ __global__ void run(ll* in, ll* out, int N)
 
     //   /* curand works like rand - except that it takes a state as a parameter
     //   */
-    //     rand1 = int(curand(&state) % HEAP_SIZE);
-    //     rand2 = int(curand(&state) % HEAP_SIZE);
+    //     rand1 = int(curand(&state) % QUEUE_SIZE);
+    //     rand2 = int(curand(&state) % QUEUE_SIZE);
     // if (tid == 0)
     //     printf("rand1: %i, rand2: %i\n", rand1, rand2);
 
     return;
 }
 
-int main(int argc, char** argv)
+TEST_CASE("Produce-Consumer", "[cuda][producer-consumer]")
 {
-    vector<ll> nums;
+    const int N = GENERATE(100, 10'000, 10'000'000);
 
-    int N = atoi(argv[1]);
+    std::vector<long> nums(N);
+    std::iota(nums.begin(), nums.end(), 0); // range 0 to N-1
 
-    for (ll i = 0; i < N; i++) {
-        nums.push_back(i);
-    }
-
-    ll* d_in;
-    cudaMalloc((void**)&d_in, sizeof(ll) * N);
-    cudaMemcpy(d_in, nums.data(), sizeof(ll) * N, cudaMemcpyHostToDevice);
-
-    ll* d_out;
-    cudaMalloc((void**)&d_out, sizeof(ll) * N);
-    cudaMemset(d_out, 0, sizeof(ll) * N);
+    thrust::device_vector<long> d_in = nums;
+    thrust::device_vector<long> d_out(N, 0);
 
     int block = 1024;
     int grid = (N / block + 1);
@@ -128,9 +121,9 @@ int main(int argc, char** argv)
     record("run", grid, block, 8, run, d_in, d_out, N);
     cudaDeviceSynchronize();
 
-    vector<ll> out;
+    vector<long> out;
     out.resize(N);
-    cudaMemcpy(out.data(), d_out, sizeof(ll) * N, cudaMemcpyDeviceToHost);
+    cudaMemcpy(out.data(), d_out, sizeof(long) * N, cudaMemcpyDeviceToHost);
 
     // int s = accumulate(out.begin(), out.end(), 0);
     int s = 0;
