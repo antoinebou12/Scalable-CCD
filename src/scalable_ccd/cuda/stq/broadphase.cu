@@ -76,11 +76,10 @@ BroadPhase::build(const std::vector<cuda::stq::AABB>& boxes)
 
     {
         SCALABLE_CCD_GPU_PROFILE_POINT("sortingBoxes");
+        // Only sort the split boxes and keep the d_boxes unsorted
         thrust::sort_by_key(
             thrust::device, d_sm.begin(), d_sm.end(), d_mini.begin(),
             sort_aabb_x());
-        thrust::sort(
-            thrust::device, d_boxes.begin(), d_boxes.end(), sort_aabb_x());
     }
 
     gpuErrchk(cudaGetLastError());
@@ -118,12 +117,12 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
 #ifdef SCALABLE_CCD_USE_CUDA_SAP
             runSAP<<<grid_dim_1d(), threads_per_block>>>(
                 thrust::raw_pointer_cast(d_sm.data()),
-                thrust::raw_pointer_cast(d_mini.data()), d_boxes.size(),
+                thrust::raw_pointer_cast(d_mini.data()), num_boxes(),
                 thread_start_box_id, d_overlaps_buffer, &d_memory_handler);
 #else
             runSTQ<<<grid_dim_1d(), threads_per_block>>>(
                 thrust::raw_pointer_cast(d_sm.data()),
-                thrust::raw_pointer_cast(d_mini.data()), d_boxes.size(),
+                thrust::raw_pointer_cast(d_mini.data()), num_boxes(),
                 thread_start_box_id, d_overlaps_buffer, &d_memory_handler);
 #endif
 

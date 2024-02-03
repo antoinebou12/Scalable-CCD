@@ -1,85 +1,74 @@
 #pragma once
 #include <scalable_ccd/cuda/scalar.cuh>
 #include <scalable_ccd/cuda/memory_handler.cuh>
-#include <scalable_ccd/cuda/tight_inclusion/type.hpp>
-#include <scalable_ccd/cuda/tight_inclusion/record.hpp>
+#include <scalable_ccd/cuda/types.cuh>
 #include <scalable_ccd/cuda/stq/aabb.cuh>
+#include <scalable_ccd/cuda/utils/device_matrix.cuh>
+#include <scalable_ccd/cuda/utils/profiler.hpp>
+#include <scalable_ccd/utils/logger.hpp>
 
-#include <spdlog/spdlog.h>
-
+#include <thrust/device_vector.h>
 #include <vector>
 
 namespace scalable_ccd::cuda {
 
-__global__ void addData(
-    const int2* const overlaps,
-    const cuda::stq::AABB* const boxes,
-    const Scalar* const V0,
-    const Scalar* const V1,
-    int Vrows,
-    int N,
-    // Scalar3 *queries);
-    CCDData* data,
-    int shift = 0);
+/// @brief
+/// @param boxes
+/// @param memory_handler
+/// @param vertices_t0
+/// @param vertices_t1
+/// @param N
+/// @param nbox
+/// @param parallel
+/// @param devcount
+/// @param limitGB
+/// @param overlaps
+/// @param result_list
+/// @param allow_zero_toi
+/// @param min_distance
+/// @return
+// double run_ccd(
+//     const std::vector<cuda::stq::AABB> boxes,
+//     std::shared_ptr<MemoryHandler> memory_handler,
+//     const Eigen::MatrixXd& vertices_t0,
+//     const Eigen::MatrixXd& vertices_t1,
+//     int N,
+//     int& nbox,
+//     int& parallel,
+//     int& devcount,
+//     int& limitGB,
+//     std::vector<std::pair<int, int>>& overlaps,
+//     std::vector<int>& result_list,
+//     const bool allow_zero_toi,
+//     Scalar& min_distance);
 
-void run_ccd(
-    const std::vector<cuda::stq::AABB> boxes,
-    MemoryHandler* memory_handler,
-    const Eigen::MatrixXd& vertices_t0,
-    const Eigen::MatrixXd& vertices_t1,
-    Record& r,
-    int N,
-    int& nbox,
-    int& parallel,
-    int& devcount,
-    int& limitGB,
-    std::vector<std::pair<int, int>>& overlaps,
+/// @brief Run the CCD narrow phase on the GPU
+/// @param d_vertices_t0
+/// @param d_vertices_t1
+/// @param d_boxes The list of AABBs
+/// @param d_overlaps The list of pairs of indices of the boxes that overlap
+/// @param num_vertices
+/// @param threads
+/// @param max_iter
+/// @param tol
+/// @param ms
+/// @param allow_zero_toi
+/// @param memory_handler
+/// @param result_list
+/// @param toi
+/// @return
+void run_narrow_phase(
+    const DeviceMatrix<Scalar>& d_vertices_t0,
+    const DeviceMatrix<Scalar>& d_vertices_t1,
+    const thrust::device_vector<stq::AABB>& d_boxes,
+    const thrust::device_vector<int2>& d_overlaps,
+    const int threads,
+    const int max_iter,
+    const Scalar tol,
+    const Scalar ms,
+    const bool allow_zero_toi,
+    std::shared_ptr<MemoryHandler> memory_handler,
     std::vector<int>& result_list,
-    bool& allow_zero_toi,
-    Scalar& min_distance,
     Scalar& toi);
-
-void run_narrowphase(
-    int2* d_overlaps,
-    cuda::stq::AABB* d_boxes,
-    MemoryHandler* memory_handler,
-    int count,
-    Scalar* d_vertices_t0,
-    Scalar* d_vertices_t1,
-    int Vrows,
-    int threads,
-    int max_iter,
-    Scalar tol,
-    Scalar ms,
-    bool allow_zero_toi,
-    std::vector<int>& result_list,
-    Scalar& toi,
-    Record& r);
-
-void construct_static_collision_candidates(
-    const Eigen::MatrixXd& V,
-    const Eigen::MatrixXi& E,
-    const Eigen::MatrixXi& F,
-    std::vector<std::pair<int, int>>& overlaps,
-    std::vector<cuda::stq::AABB>& boxes,
-    double inflation_radius = 0);
-
-void construct_continuous_collision_candidates(
-    const Eigen::MatrixXd& V0,
-    const Eigen::MatrixXd& V1,
-    const Eigen::MatrixXi& E,
-    const Eigen::MatrixXi& F,
-    std::vector<std::pair<int, int>>& overlaps,
-    std::vector<cuda::stq::AABB>& boxes,
-    double inflation_radius = 0);
-
-Scalar compute_toi_strategy(
-    const Eigen::MatrixXd& V0,
-    const Eigen::MatrixXd& V1,
-    const Eigen::MatrixXi& E,
-    const Eigen::MatrixXi& F,
-    int max_iter,
-    Scalar min_distance,
-    Scalar tolerance);
 
 } // namespace scalable_ccd::cuda

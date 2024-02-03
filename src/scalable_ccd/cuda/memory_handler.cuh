@@ -94,76 +94,71 @@ __device__ __host__ struct MemoryHandler {
         }
     }
 
-    void handleNarrowPhase(int& nbr)
+    void handleNarrowPhase(size_t& nbr)
     {
-        size_t allocatable = 0;
-        size_t constraint = 0;
-        allocatable = __getAllocatable();
-        nbr = std::min(static_cast<size_t>(nbr), MAX_QUERIES);
-        constraint = sizeof(CCDData) * nbr
-            + sizeof(CCDConfig); //+ nbr * sizeof(int2) * 2 +
-                                 //+ sizeof(CCDData) * nbr;
+        const size_t allocatable = __getAllocatable();
+
+        nbr = std::min(nbr, MAX_QUERIES);
+
+        size_t constraint = sizeof(CCDData) * nbr + sizeof(CCDConfig);
         if (allocatable <= constraint) {
             MAX_QUERIES = (allocatable - sizeof(CCDConfig)) / sizeof(CCDData);
             logger().debug(
-                "Insufficient memory for queries, shrinking queries to {:d}",
-                MAX_QUERIES);
-            nbr = std::min(static_cast<size_t>(nbr), MAX_QUERIES);
+                "Insufficient memory for queries (requires {:g} GB); shrinking max queries to {:d}",
+                constraint / 1e9, MAX_QUERIES);
+            nbr = std::min(nbr, MAX_QUERIES);
             return;
         }
-        constraint =
-            sizeof(MP_unit) * nbr + sizeof(CCDConfig) + sizeof(CCDData) * nbr;
 
+        constraint += sizeof(MP_unit) * nbr;
         if (allocatable <= constraint) {
             MAX_UNIT_SIZE = (allocatable - sizeof(CCDConfig))
                 / (sizeof(CCDData) + sizeof(MP_unit));
-            logger().debug(
-                "[MEM INITIAL ISSUE]:  unit size, shrinking unit size to {:d}",
-                MAX_UNIT_SIZE);
-            nbr = std::min(static_cast<size_t>(nbr), MAX_UNIT_SIZE);
+            logger().warn(
+                "Insufficient memory for MP units (requires {:g} GB); shrinking max unit size to {:d}",
+                constraint / 1e9, MAX_UNIT_SIZE);
+            nbr = std::min(nbr, MAX_UNIT_SIZE);
             return;
         }
+
         // we are ok if we made it here
 
-        size_t available_units = allocatable - constraint;
-        available_units /= sizeof(MP_unit);
-        // size_t default_units = MAX_UNIT_SIZE ? 2 * MAX_UNIT_SIZE : 2 *
-        // size_t default_units = 2 * MAX_QUERIES;
-        // if we havent set max_unit_size, set it
-        logger().debug(
-            "unit options: available {:d} or overlap mulitplier {:d}",
-            available_units, MAX_UNIT_SIZE);
-        size_t default_units = 2 * nbr;
-        MAX_UNIT_SIZE = std::min(available_units, default_units);
-        logger().debug("[MEM INITIAL OK]: MAX_UNIT_SIZE={:d}", MAX_UNIT_SIZE);
-        nbr = std::min(static_cast<size_t>(nbr), MAX_UNIT_SIZE);
+        const size_t available_units =
+            (allocatable - constraint) / sizeof(MP_unit);
+        logger().trace(
+            "Can allocate {:d} ({:g} GB) units", available_units,
+            available_units * sizeof(MP_unit) / 1e9);
+
+        MAX_UNIT_SIZE = std::min(available_units, 2 * nbr);
+        logger().trace("Setting a max unit size to {:d}", MAX_UNIT_SIZE);
+
+        nbr = std::min(nbr, MAX_UNIT_SIZE);
+
         return;
     }
 
-    void handleOverflow(int& nbr)
+    void handleOverflow(size_t& nbr)
     {
-        size_t constraint = sizeof(MP_unit) * 2 * MAX_UNIT_SIZE
-            + sizeof(CCDConfig) //+ tmp_nbr * sizeof(int2) * 2 +
-            + sizeof(CCDData) * nbr;
+        const size_t allocatable = __getAllocatable();
+        size_t constraint = 2 * sizeof(MP_unit) * MAX_UNIT_SIZE
+            + sizeof(CCDData) * nbr + sizeof(CCDConfig);
 
-        size_t allocatable = __getAllocatable();
         if (allocatable > constraint) {
-            MAX_UNIT_SIZE *= 2;
+            MAX_UNIT_SIZE <<= 2;
             logger().debug(
-                "Overflow: Doubling unit_size to {:d}", MAX_UNIT_SIZE);
+                "Overflow: increasing unit_size to {:d}", MAX_UNIT_SIZE);
         } else {
             while (allocatable <= constraint) {
-                MAX_QUERIES /= 2;
-                nbr = std::min(static_cast<size_t>(nbr), MAX_QUERIES);
-                logger().debug(
-                    "Overflow: Halving queries to {:d}", MAX_QUERIES);
+                MAX_QUERIES >>= 2;
+                nbr = std::min(nbr, MAX_QUERIES);
                 constraint = sizeof(MP_unit) * MAX_UNIT_SIZE
-                    + sizeof(CCDConfig) //+ tmp_nbr * sizeof(int2) * 2 +
-                    + sizeof(CCDData) * nbr;
+                    + sizeof(CCDData) * nbr + sizeof(CCDConfig);
             }
+            logger().debug(
+                "Overflow: reducing # of queries to {:d}", MAX_QUERIES);
         }
-        nbr = std::min(
-            MAX_UNIT_SIZE, std::min(static_cast<size_t>(nbr), MAX_QUERIES));
+
+        nbr = std::min({ nbr, MAX_UNIT_SIZE, MAX_QUERIES });
     }
 };
 

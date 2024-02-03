@@ -64,8 +64,11 @@ public:
     /// @brief Is the broad phase algorithm complete?
     bool is_complete() const { return thread_start_box_id >= d_boxes.size(); }
 
-    /// @brief Get the boxes stored on the GPU.
+    /// @brief Get the boxes stored on the GPU (unsorted).
     const thrust::device_vector<cuda::stq::AABB>& boxes() { return d_boxes; }
+
+    /// @brief Get the number of boxes stored on the GPU.
+    size_t num_boxes() const { return d_boxes.size(); }
 
     /// @brief Get the resulting overlaps stored on the GPU.
     const thrust::device_vector<int2>& overlaps() { return d_overlaps; }
