@@ -5,8 +5,8 @@
 #include <fstream>
 #include <iostream>
 
-#include <scalable_ccd/cuda/tight_inclusion/root_finder.cuh>
-#include <scalable_ccd/cuda/stq/aabb.cuh>
+#include <scalable_ccd/cuda/narrow_phase/root_finder.cuh>
+#include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/cuda/utils/device_variable.cuh>
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
 #include <scalable_ccd/cuda/utils/profiler.hpp>

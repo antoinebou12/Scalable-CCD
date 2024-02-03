@@ -2,8 +2,8 @@
 
 #include <scalable_ccd/config.hpp>
 #include <scalable_ccd/utils/merge_local_overlaps.hpp>
-#include <scalable_ccd/cuda/stq/sweep.cuh>
-#include <scalable_ccd/cuda/stq/util.cuh>
+#include <scalable_ccd/cuda/broad_phase/sweep.cuh>
+#include <scalable_ccd/cuda/broad_phase/util.cuh>
 
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>

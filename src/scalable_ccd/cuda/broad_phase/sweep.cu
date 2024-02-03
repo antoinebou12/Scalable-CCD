@@ -1,8 +1,8 @@
 #include <cuda/pipeline>
 
-// #include <scalable_ccd/cuda/stq/aabb.cuh>
-#include <scalable_ccd/cuda/stq/queue.cuh>
-#include <scalable_ccd/cuda/stq/sweep.cuh>
+// #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
+#include <scalable_ccd/cuda/broad_phase/queue.cuh>
+#include <scalable_ccd/cuda/broad_phase/sweep.cuh>
 #include <scalable_ccd/utils/logger.hpp>
 
 namespace scalable_ccd::cuda::stq {

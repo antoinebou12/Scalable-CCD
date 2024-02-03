@@ -14,6 +14,6 @@ target_sources(scalable_ccd PRIVATE ${SOURCES})
 # Subfolders
 ################################################################################
 
-add_subdirectory(stq)
-add_subdirectory(tight_inclusion)
+add_subdirectory(broad_phase)
+add_subdirectory(narrow_phase)
 add_subdirectory(utils)

@@ -2,7 +2,7 @@
 #include <scalable_ccd/cuda/scalar.cuh>
 #include <scalable_ccd/cuda/memory_handler.cuh>
 #include <scalable_ccd/cuda/types.cuh>
-#include <scalable_ccd/cuda/stq/aabb.cuh>
+#include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/cuda/utils/device_matrix.cuh>
 #include <scalable_ccd/cuda/utils/profiler.hpp>
 #include <scalable_ccd/utils/logger.hpp>

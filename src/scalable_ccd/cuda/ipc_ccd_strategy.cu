@@ -1,8 +1,8 @@
 #include "ipc_ccd_strategy.hpp"
 
 #include <scalable_ccd/config.hpp>
-#include <scalable_ccd/cuda/stq/broad_phase.cuh>
-#include <scalable_ccd/cuda/tight_inclusion/narrow_phase.cuh>
+#include <scalable_ccd/cuda/broad_phase/broad_phase.cuh>
+#include <scalable_ccd/cuda/narrow_phase/narrow_phase.cuh>
 #include <scalable_ccd/cuda/utils/device_matrix.cuh>
 
 namespace scalable_ccd::cuda {

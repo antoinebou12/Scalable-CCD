@@ -1,8 +1,8 @@
 #include "broad_phase.cuh"
 
 #include <scalable_ccd/config.hpp>
-#include <scalable_ccd/cuda/stq/sweep.cuh>
-#include <scalable_ccd/cuda/stq/util.cuh>
+#include <scalable_ccd/cuda/broad_phase/sweep.cuh>
+#include <scalable_ccd/cuda/broad_phase/util.cuh>
 #include <scalable_ccd/cuda/utils/profiler.hpp>
 #include <scalable_ccd/cuda/utils/device_variable.cuh>
 

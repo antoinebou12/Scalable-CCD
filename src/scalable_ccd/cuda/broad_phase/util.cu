@@ -1,7 +1,7 @@
 
 #include "util.cuh"
 
-#include <scalable_ccd/cuda/stq/queue.cuh>
+#include <scalable_ccd/cuda/broad_phase/queue.cuh>
 #include <scalable_ccd/utils/logger.hpp>
 
 namespace scalable_ccd::cuda::stq {

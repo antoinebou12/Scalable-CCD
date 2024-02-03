@@ -2,9 +2,9 @@
 #include "ground_truth.hpp"
 
 #include <scalable_ccd/cuda/memory_handler.cuh>
-#include <scalable_ccd/cuda/stq/broad_phase.cuh>
-#include <scalable_ccd/cuda/stq/util.cuh>
-#include <scalable_ccd/cuda/stq/aabb.cuh>
+#include <scalable_ccd/cuda/broad_phase/broad_phase.cuh>
+#include <scalable_ccd/cuda/broad_phase/util.cuh>
+#include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/utils/pca.hpp>
 #include <scalable_ccd/utils/logger.hpp>
 

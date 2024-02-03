@@ -3,9 +3,9 @@
 
 #include <scalable_ccd/scalar.hpp>
 #include <scalable_ccd/cuda/memory_handler.cuh>
-#include <scalable_ccd/cuda/stq/aabb.cuh>
-#include <scalable_ccd/cuda/stq/util.cuh>
-#include <scalable_ccd/cuda/tight_inclusion/narrow_phase.cuh>
+#include <scalable_ccd/cuda/broad_phase/aabb.cuh>
+#include <scalable_ccd/cuda/broad_phase/util.cuh>
+#include <scalable_ccd/cuda/narrow_phase/narrow_phase.cuh>
 #include <scalable_ccd/cuda/utils/profiler.hpp>
 #include <scalable_ccd/utils/timer.hpp>
 #include <scalable_ccd/utils/logger.hpp>

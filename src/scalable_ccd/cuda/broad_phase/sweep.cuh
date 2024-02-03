@@ -2,7 +2,7 @@
 
 #include <scalable_ccd/cuda/types.cuh>
 #include <scalable_ccd/cuda/memory_handler.cuh>
-#include <scalable_ccd/cuda/stq/collision.cuh>
+#include <scalable_ccd/cuda/broad_phase/collision.cuh>
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
 
 namespace scalable_ccd::cuda::stq {

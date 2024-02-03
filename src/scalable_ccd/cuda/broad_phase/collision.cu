@@ -1,4 +1,4 @@
-#include <scalable_ccd/cuda/stq/collision.cuh>
+#include <scalable_ccd/cuda/broad_phase/collision.cuh>
 
 namespace scalable_ccd::cuda::stq {
 

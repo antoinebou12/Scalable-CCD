@@ -1,4 +1,4 @@
-#include <scalable_ccd/cuda/stq/queue.cuh>
+#include <scalable_ccd/cuda/broad_phase/queue.cuh>
 #include <iostream>
 
 namespace scalable_ccd::cuda::stq {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <scalable_ccd/cuda/stq/aabb.cuh>
+#include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
 
 namespace scalable_ccd::cuda::stq {
