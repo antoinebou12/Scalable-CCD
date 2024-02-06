@@ -1,6 +1,9 @@
 #pragma once
 
 #include <scalable_ccd/cuda/memory_handler.hpp>
+#include <scalable_ccd/cuda/narrow_phase/ccd_config.cuh>
+#include <scalable_ccd/cuda/narrow_phase/ccd_data.cuh>
+#include <scalable_ccd/cuda/narrow_phase/interval.cuh>
 
 #include <thrust/device_vector.h>
 
@@ -9,7 +12,7 @@
 
 namespace scalable_ccd::cuda {
 
-__global__ void initialize_memory_pool(MP_unit* units, int query_size);
+__global__ void initialize_memory_pool(CCDDomain* units, int query_size);
 
 __global__ void compute_vf_tolerance_memory_pool(
     CCDData* data, CCDConfig* config, const int query_size);
@@ -20,10 +23,10 @@ __global__ void compute_ee_tolerance_memory_pool(
 __global__ void shift_queue_pointers(CCDConfig* config);
 
 __global__ void vf_ccd_memory_pool(
-    MP_unit* units, int query_size, CCDData* data, CCDConfig* config);
+    CCDDomain* units, int query_size, CCDData* data, CCDConfig* config);
 
 __global__ void ee_ccd_memory_pool(
-    MP_unit* units, int query_size, CCDData* data, CCDConfig* config);
+    CCDDomain* units, int query_size, CCDData* data, CCDConfig* config);
 
 __global__ void compute_ee_tolerance_memory_pool(
     CCDData* data, CCDConfig* config, const int query_size);

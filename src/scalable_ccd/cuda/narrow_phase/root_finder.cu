@@ -13,16 +13,6 @@ using namespace std;
 
 namespace scalable_ccd::cuda {
 
-// this function do the bisection
-__device__ IntervalPair::IntervalPair(const Interval& itv)
-{
-    Scalar c = (itv.first + itv.second) / 2;
-    first.first = itv.first;
-    first.second = c;
-    second.first = c;
-    second.second = itv.second;
-}
-
 __device__ bool sum_no_larger_1(const Scalar& num1, const Scalar& num2)
 {
 #ifdef SCALABLE_CCD_USE_DOUBLE
@@ -307,27 +297,6 @@ get_numerical_error_ee_memory_pool(CCDData& data_in, bool use_ms)
     return;
 }
 
-__device__ void BoxPrimatives::calculate_tuv(const MP_unit& unit)
-{
-    if (b[0] == 0) { // t0
-        t = unit.itv[0].first;
-    } else { // t1
-        t = unit.itv[0].second;
-    }
-
-    if (b[1] == 0) { // u0
-        u = unit.itv[1].first;
-    } else { // u1
-        u = unit.itv[1].second;
-    }
-
-    if (b[2] == 0) { // v0
-        v = unit.itv[2].first;
-    } else { // v1
-        v = unit.itv[2].second;
-    }
-}
-
 __device__ Scalar calculate_vf(const CCDData& data_in, const BoxPrimatives& bp)
 {
     Scalar v, pt, t0, t1, t2;
@@ -360,7 +329,7 @@ __device__ Scalar calculate_ee(const CCDData& data_in, const BoxPrimatives& bp)
 }
 
 inline __device__ bool Origin_in_vf_inclusion_function_memory_pool(
-    const CCDData& data_in, MP_unit& unit, Scalar& true_tol, bool& box_in)
+    const CCDData& data_in, CCDDomain& unit, Scalar& true_tol, bool& box_in)
 {
     box_in = true;
     true_tol = 0.0;
@@ -402,7 +371,7 @@ inline __device__ bool Origin_in_vf_inclusion_function_memory_pool(
 }
 
 inline __device__ bool Origin_in_ee_inclusion_function_memory_pool(
-    const CCDData& data_in, MP_unit& unit, Scalar& true_tol, bool& box_in)
+    const CCDData& data_in, CCDDomain& unit, Scalar& true_tol, bool& box_in)
 {
     box_in = true;
     true_tol = 0.0;
@@ -477,7 +446,7 @@ __global__ void compute_ee_tolerance_memory_pool(
     get_numerical_error_ee_memory_pool(data[tx], config[0].use_ms);
 }
 
-__global__ void initialize_memory_pool(MP_unit* units, int query_size)
+__global__ void initialize_memory_pool(CCDDomain* units, int query_size)
 {
     int tx = threadIdx.x + blockIdx.x * blockDim.x;
     if (tx >= query_size)
@@ -504,21 +473,21 @@ __device__ int split_dimension_memory_pool(const CCDData& data, Scalar width[3])
 }
 
 inline __device__ bool bisect_vf_memory_pool(
-    const MP_unit& unit,
+    const CCDDomain& unit,
     int split,
     CCDConfig* config,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
     Scalar data_toi,
 #endif
-    MP_unit* out)
+    CCDDomain* out)
 {
-    IntervalPair halves(unit.itv[split]); // bisected
+    const ::cuda::std::array<Interval, 2> halves = unit.tuv[split].split();
 
-    if (halves.first.first >= halves.first.second) {
+    if (halves[0].lower >= halves[0].upper) {
         // valid_nbr = 0;
         return true;
     }
-    if (halves.second.first >= halves.second.second) {
+    if (halves[1].lower >= halves[1].upper) {
         // valid_nbr = 0;
         return true;
     }
@@ -528,57 +497,53 @@ inline __device__ bool bisect_vf_memory_pool(
 
     int unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
     out[unit_id] = unit;
-    out[unit_id].itv[split] = halves.first;
+    out[unit_id].tuv[split] = halves[0];
 
     if (split == 0) {
 #ifndef SCALABLE_CCD_TOI_PER_QUERY
-        if (halves.second.first <= config[0].toi) {
+        if (halves[1].lower <= config[0].toi) {
 #else
-        if (halves.second.first <= data_toi) {
+        if (halves[1].lower <= data_toi) {
 #endif
             unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
             out[unit_id] = unit;
-            out[unit_id].itv[split] = halves.second;
+            out[unit_id].tuv[split] = halves[1];
         }
     } else if (split == 1) {
-        if (sum_no_larger_1(
-                halves.second.first,
-                unit.itv[2].first)) // check if u+v<=1
-        {
+        // check if u+v<=1
+        if (sum_no_larger_1(halves[1].lower, unit.tuv[2].lower)) {
             unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
             out[unit_id] = unit;
-            out[unit_id].itv[1] = halves.second;
+            out[unit_id].tuv[1] = halves[1];
             // valid_nbr = 2;
         }
     } else if (split == 2) {
-        if (sum_no_larger_1(
-                halves.second.first,
-                unit.itv[1].first)) // check if u+v<=1
-        {
+        // check if u+v<=1
+        if (sum_no_larger_1(halves[1].lower, unit.tuv[1].lower)) {
             unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
             out[unit_id] = unit;
-            out[unit_id].itv[2] = halves.second;
+            out[unit_id].tuv[2] = halves[1];
             // valid_nbr = 2;
         }
     }
     return false;
 }
 inline __device__ bool bisect_ee_memory_pool(
-    const MP_unit& unit,
+    const CCDDomain& unit,
     int split,
     CCDConfig* config,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
     Scalar data_toi,
 #endif
-    MP_unit* out)
+    CCDDomain* out)
 {
-    IntervalPair halves(unit.itv[split]); // bisected
+    const ::cuda::std::array<Interval, 2> halves = unit.tuv[split].split();
 
-    if (halves.first.first >= halves.first.second) {
+    if (halves[0].lower >= halves[0].upper) {
         // valid_nbr = 0;
         return true;
     }
-    if (halves.second.first >= halves.second.second) {
+    if (halves[1].lower >= halves[1].upper) {
         // valid_nbr = 0;
         return true;
     }
@@ -588,24 +553,24 @@ inline __device__ bool bisect_ee_memory_pool(
 
     int unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
     out[unit_id] = unit;
-    out[unit_id].itv[split] = halves.first;
+    out[unit_id].tuv[split] = halves[0];
 
     if (split == 0) // split the time interval
     {
 #ifndef SCALABLE_CCD_TOI_PER_QUERY
-        if (halves.second.first <= config[0].toi) {
+        if (halves[1].lower <= config[0].toi) {
 #else
-        if (halves.second.first <= data_toi) {
+        if (halves[1].lower <= data_toi) {
 #endif
             unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
             out[unit_id] = unit;
-            out[unit_id].itv[split] = halves.second;
+            out[unit_id].tuv[split] = halves[1];
         }
     } else {
 
         unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
         out[unit_id] = unit;
-        out[unit_id].itv[split] = halves.second;
+        out[unit_id].tuv[split] = halves[1];
         // valid_nbr = 2;
     }
 
@@ -624,7 +589,7 @@ inline __device__ void mutex_update_min(
 }
 
 __global__ void vf_ccd_memory_pool(
-    MP_unit* units, int query_size, CCDData* data, CCDConfig* config)
+    CCDDomain* units, int query_size, CCDData* data, CCDConfig* config)
 {
     int tx = threadIdx.x + blockIdx.x * blockDim.x;
     if (tx >= config[0].mp_remaining)
@@ -637,13 +602,13 @@ __global__ void vf_ccd_memory_pool(
     bool condition;
     // int split;
 
-    MP_unit units_in = units[qid];
+    CCDDomain units_in = units[qid];
     int box_id = units_in.query_id;
     CCDData data_in = data[box_id];
 
     atomicAdd(&data[box_id].nbr_checks, 1);
 
-    const Scalar time_left = units_in.itv[0].first; // the time of this unit
+    const Scalar time_left = units_in.tuv[0].lower; // the time of this unit
 
 // if the time is larger than toi, return
 #ifndef SCALABLE_CCD_TOI_PER_QUERY
@@ -677,9 +642,9 @@ __global__ void vf_ccd_memory_pool(
     const bool zero_in = Origin_in_vf_inclusion_function_memory_pool(
         data_in, units_in, true_tol, box_in);
     if (zero_in) {
-        widths[0] = units_in.itv[0].second - units_in.itv[0].first;
-        widths[1] = units_in.itv[1].second - units_in.itv[1].first;
-        widths[2] = units_in.itv[2].second - units_in.itv[2].first;
+        widths[0] = units_in.tuv[0].upper - units_in.tuv[0].lower;
+        widths[1] = units_in.tuv[1].upper - units_in.tuv[1].lower;
+        widths[2] = units_in.tuv[2].upper - units_in.tuv[2].lower;
 
         // Condition 1
         condition = widths[0] <= data_in.tol[0] && widths[1] <= data_in.tol[1]
@@ -742,7 +707,7 @@ __global__ void vf_ccd_memory_pool(
     }
 }
 __global__ void ee_ccd_memory_pool(
-    MP_unit* units, int query_size, CCDData* data, CCDConfig* config)
+    CCDDomain* units, int query_size, CCDData* data, CCDConfig* config)
 {
     //   bool allow_zero_toi = true;
 
@@ -755,13 +720,13 @@ __global__ void ee_ccd_memory_pool(
     Scalar widths[3];
     bool condition;
 
-    MP_unit units_in = units[qid];
+    CCDDomain units_in = units[qid];
     int box_id = units_in.query_id;
     CCDData data_in = data[box_id];
 
     atomicAdd(&data[box_id].nbr_checks, 1);
 
-    const Scalar time_left = units_in.itv[0].first; // the time of this unit
+    const Scalar time_left = units_in.tuv[0].lower; // the time of this unit
 
 // if the time is larger than toi, return
 #ifndef SCALABLE_CCD_TOI_PER_QUERY
@@ -795,9 +760,9 @@ __global__ void ee_ccd_memory_pool(
     const bool zero_in = Origin_in_ee_inclusion_function_memory_pool(
         data_in, units_in, true_tol, box_in);
     if (zero_in) {
-        widths[0] = units_in.itv[0].second - units_in.itv[0].first;
-        widths[1] = units_in.itv[1].second - units_in.itv[1].first;
-        widths[2] = units_in.itv[2].second - units_in.itv[2].first;
+        widths[0] = units_in.tuv[0].upper - units_in.tuv[0].lower;
+        widths[1] = units_in.tuv[1].upper - units_in.tuv[1].lower;
+        widths[2] = units_in.tuv[2].upper - units_in.tuv[2].lower;
 
         // Condition 1
         condition = widths[0] <= data_in.tol[0] && widths[1] <= data_in.tol[1]
@@ -907,10 +872,10 @@ bool run_memory_pool_ccd(
     config[0].max_iter = max_iter;
 
     // int *d_res;
-    MP_unit* d_units;
+    CCDDomain* d_units;
     CCDConfig* d_config;
 
-    size_t unit_size = sizeof(MP_unit) * config[0].unit_size;
+    size_t unit_size = sizeof(CCDDomain) * config[0].unit_size;
     logger().debug("unit_size: {:d}", config[0].unit_size);
     logger().debug("unit_size (bytes): {:d}", unit_size);
     logger().debug(
