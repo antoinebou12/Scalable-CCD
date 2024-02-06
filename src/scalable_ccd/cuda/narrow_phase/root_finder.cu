@@ -3,11 +3,10 @@
 #include <scalable_ccd/config.hpp>
 #include <scalable_ccd/utils/logger.hpp>
 #include <scalable_ccd/cuda/utils/assert.cuh>
+#include <scalable_ccd/cuda/utils/atomic_min_float.cuh>
 
 #include <array>
 #include <vector>
-
-#include <cuda/semaphore>
 
 using namespace std;
 
@@ -421,9 +420,6 @@ __global__ void compute_vf_tolerance_memory_pool(
     if (tx >= query_size)
         return;
 
-    // release the mutex here before real calculations
-    config[0].mutex.release();
-
     compute_face_vertex_tolerance_memory_pool(data[tx], config[0]);
 
     data[tx].nbr_checks = 0;
@@ -436,9 +432,6 @@ __global__ void compute_ee_tolerance_memory_pool(
     int tx = threadIdx.x + blockIdx.x * blockDim.x;
     if (tx >= query_size)
         return;
-
-    // release the mutex here before real calculations
-    config[0].mutex.release();
 
     compute_edge_edge_tolerance_memory_pool(data[tx], config[0]);
 
@@ -577,17 +570,6 @@ inline __device__ bool bisect_ee_memory_pool(
     return false;
 }
 
-inline __device__ void mutex_update_min(
-    ::cuda::binary_semaphore<::cuda::thread_scope_device>& mutex,
-    Scalar& value,
-    const Scalar& compare)
-{
-    mutex.acquire();
-    value =
-        compare < value ? compare : value; // if compare is smaller, update it
-    mutex.release();
-}
-
 __global__ void vf_ccd_memory_pool(
     CCDDomain* units, int query_size, CCDData* data, CCDConfig* config)
 {
@@ -650,11 +632,11 @@ __global__ void vf_ccd_memory_pool(
         condition = widths[0] <= data_in.tol[0] && widths[1] <= data_in.tol[1]
             && widths[2] <= data_in.tol[2];
         if (condition) {
-            mutex_update_min(config[0].mutex, config[0].toi, time_left);
+            atomicMin(&config[0].toi, time_left);
             // results[box_id] = 1;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            mutex_update_min(config[0].mutex, data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, time_left);
 #endif
             return;
         }
@@ -662,11 +644,11 @@ __global__ void vf_ccd_memory_pool(
         // true; condition = units_in.box_in;
 
         if (box_in && (config[0].allow_zero_toi || time_left > 0)) {
-            mutex_update_min(config[0].mutex, config[0].toi, time_left);
+            atomicMin(&config[0].toi, time_left);
             // results[box_id] = 1;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            mutex_update_min(config[0].mutex, data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, time_left);
 #endif
             return;
         }
@@ -675,11 +657,11 @@ __global__ void vf_ccd_memory_pool(
         // return true
         condition = true_tol <= config->co_domain_tolerance;
         if (condition && (config[0].allow_zero_toi || time_left > 0)) {
-            mutex_update_min(config[0].mutex, config[0].toi, time_left);
+            atomicMin(&config[0].toi, time_left);
             // results[box_id] = 1;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            mutex_update_min(config[0].mutex, data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, time_left);
 #endif
             return;
         }
@@ -696,11 +678,11 @@ __global__ void vf_ccd_memory_pool(
         if (sure_in) // in this case, the interval is too small that overflow
                      // happens. it should be rare to happen
         {
-            mutex_update_min(config[0].mutex, config[0].toi, time_left);
+            atomicMin(&config[0].toi, time_left);
             // results[box_id] = 1;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            mutex_update_min(config[0].mutex, data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, time_left);
 #endif
             return;
         }
@@ -768,22 +750,22 @@ __global__ void ee_ccd_memory_pool(
         condition = widths[0] <= data_in.tol[0] && widths[1] <= data_in.tol[1]
             && widths[2] <= data_in.tol[2];
         if (condition) {
-            mutex_update_min(config[0].mutex, config[0].toi, time_left);
+            atomicMin(&config[0].toi, time_left);
             // results[box_id] = 1;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            mutex_update_min(config[0].mutex, data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, time_left);
 #endif
             return;
         }
         // Condition 2, the box is inside the epsilon box, have a root, return
         // true;
         if (box_in && (config[0].allow_zero_toi || time_left > 0)) {
-            mutex_update_min(config[0].mutex, config[0].toi, time_left);
+            atomicMin(&config[0].toi, time_left);
             // results[box_id] = 1;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            mutex_update_min(config[0].mutex, data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, time_left);
 #endif
             return;
         }
@@ -792,11 +774,11 @@ __global__ void ee_ccd_memory_pool(
         // return true
         condition = true_tol <= config->co_domain_tolerance;
         if (condition && (config[0].allow_zero_toi || time_left > 0)) {
-            mutex_update_min(config[0].mutex, config[0].toi, time_left);
+            atomicMin(&config[0].toi, time_left);
             // results[box_id] = 1;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            mutex_update_min(config[0].mutex, data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, time_left);
 #endif
             return;
         }
@@ -813,11 +795,11 @@ __global__ void ee_ccd_memory_pool(
         if (sure_in) // in this case, the interval is too small that overflow
                      // happens. it should be rare to happen
         {
-            mutex_update_min(config[0].mutex, config[0].toi, time_left);
+            atomicMin(&config[0].toi, time_left);
             // results[box_id] = 1;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            mutex_update_min(config[0].mutex, data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, time_left);
 #endif
 
             return;

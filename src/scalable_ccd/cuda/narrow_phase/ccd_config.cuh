@@ -2,8 +2,6 @@
 
 #include <scalable_ccd/cuda/scalar.cuh>
 
-#include <cuda/semaphore> // TODO: remove this
-
 namespace scalable_ccd::cuda {
 
 // the initialized error input, solve tolerance, time interval upper bound, etc.
@@ -28,10 +26,6 @@ struct CCDConfig {
 
     /// @brief Time of impact.
     Scalar toi;
-
-    // TODO: remove this
-    /// @brief
-    ::cuda::binary_semaphore<::cuda::thread_scope_device> mutex;
 
     /// @brief If true, use a minimum separation.
     bool use_ms;
