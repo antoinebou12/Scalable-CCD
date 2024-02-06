@@ -1,7 +1,8 @@
 #pragma once
 
-#include <scalable_ccd/cuda/memory_handler.cuh>
+#include <scalable_ccd/cuda/memory_handler.hpp>
 #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
+#include <scalable_ccd/cuda/broad_phase/utils.cuh>
 
 #include <thrust/device_vector.h>
 

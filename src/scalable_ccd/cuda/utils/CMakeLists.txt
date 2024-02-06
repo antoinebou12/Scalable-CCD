@@ -3,7 +3,6 @@ set(SOURCES
   device_buffer.cuh
   device_matrix.cuh
   device_variable.cuh
-  limits.cuh
   timer.cuh
 )
 

@@ -4,6 +4,7 @@
 #include <scalable_ccd/cuda/broad_phase/broad_phase.cuh>
 #include <scalable_ccd/cuda/narrow_phase/narrow_phase.cuh>
 #include <scalable_ccd/cuda/utils/device_matrix.cuh>
+#include <scalable_ccd/cuda/utils/assert.cuh>
 
 namespace scalable_ccd::cuda {
 
@@ -59,6 +60,7 @@ double ipc_ccd_strategy(
 
         logger().debug("Running narrow phase");
         std::vector<int> _result_list; // unused
+        const Scalar earliest_toi_before = earliest_toi;
         run_narrow_phase(
             d_vertices_t0, d_vertices_t1, broad_phase.boxes(), d_overlaps,
             npthreads, /*max_iter=*/max_iter, /*tol=*/tolerance,
@@ -66,7 +68,9 @@ double ipc_ccd_strategy(
             _result_list, earliest_toi);
 
         if (earliest_toi < 1e-6) {
-            logger().debug("Running narrow phase again (earliest_toi={:g})");
+            logger().debug(
+                "Running narrow phase again (earliest_toi={:g})", earliest_toi);
+            earliest_toi = earliest_toi_before;
             run_narrow_phase(
                 d_vertices_t0, d_vertices_t1, broad_phase.boxes(), d_overlaps,
                 npthreads, /*max_iter=*/-1, /*tol=*/tolerance, /*ms=*/0.0,
@@ -77,6 +81,8 @@ double ipc_ccd_strategy(
 
         gpuErrchk(cudaDeviceSynchronize());
     }
+
+    logger().debug("Earliest toi: {:g}", earliest_toi);
 
     return earliest_toi;
 }

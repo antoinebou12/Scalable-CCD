@@ -1,8 +1,6 @@
 set(SOURCES
     aabb.cu
     aabb.cuh
-    broad_phase_multigpu.cu
-    broad_phase_multigpu.cuh
     broad_phase.cu
     broad_phase.cuh
     collision.cu
@@ -21,3 +19,5 @@ target_sources(scalable_ccd PRIVATE ${SOURCES})
 # ==============================================================================
 # Subfolders
 # ==============================================================================
+
+# add_subdirectory(_mulitgpu)

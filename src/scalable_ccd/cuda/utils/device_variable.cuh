@@ -32,6 +32,7 @@ public:
     const T* operator&() const { return thrust::raw_pointer_cast(d_ptr); }
 
     operator T() const { return *d_ptr; }
+    T operator*() const { return *d_ptr; }
 
 private:
     thrust::device_ptr<T> d_ptr;

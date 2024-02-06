@@ -16,13 +16,12 @@ namespace scalable_ccd::cuda {
 
 namespace {
 
-    /// @brief Split the heterogeneous list of overlaps into two lists of vertex-face and edge-edge overlaps.
-    /// @param[in] boxes The list of AABBs
-    /// @param[in] overlaps The list of pairs of indices of the boxes that overlap
-    /// @param[in] N ???
-    /// @param[out] vf_overlaps The output list of pairs of indices of the vertex-face overlaps
-    /// @param[out] ee_overlaps The output list of pairs of indices of the edge-edge overlaps
-    /// @return
+    /// @brief Split the heterogeneous array of overlaps into two array of vertex-face and edge-edge overlaps.
+    /// @param[in] boxes The array of AABBs
+    /// @param[in] overlaps The array of pairs of indices of the boxes that overlap
+    /// @param[in] n_overlaps The number of overlaps
+    /// @param[out] vf_overlaps The output array of pairs of indices of the vertex-face overlaps
+    /// @param[out] ee_overlaps The output array of pairs of indices of the edge-edge overlaps
     __global__ void split_overlaps(
         const AABB* const boxes,
         const int2* const overlaps,
@@ -51,6 +50,14 @@ namespace {
         }
     }
 
+    /// @brief Populate the CCDData array with the necessary data for the narrow phase.
+    /// @param V0 Vertex positions at time t=0
+    /// @param V1 Vertex positions at time t=1
+    /// @param n_vertices The number of vertices
+    /// @param boxes The array of AABBs
+    /// @param overlaps The array of pairs of indices of the boxes that overlap
+    /// @param ms Minimum separation distance
+    /// @param data The output array of CCDData
     __global__ void add_data(
         const Scalar* const V0,
         const Scalar* const V1,
@@ -66,10 +73,10 @@ namespace {
 
         data[tid].ms = ms;
 
-        int minner = min(overlaps[tid].x, overlaps[tid].y);
-        int maxxer = max(overlaps[tid].x, overlaps[tid].y);
-        int3 avids = boxes[minner].vertex_ids;
-        int3 bvids = boxes[maxxer].vertex_ids;
+        const int minner = min(overlaps[tid].x, overlaps[tid].y);
+        const int maxxer = max(overlaps[tid].x, overlaps[tid].y);
+        const int3 avids = boxes[minner].vertex_ids;
+        const int3 bvids = boxes[maxxer].vertex_ids;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
         data[tid].toi = std::numeric_limits<Scalar>::infinity();

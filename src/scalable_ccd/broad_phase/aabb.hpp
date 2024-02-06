@@ -9,9 +9,6 @@
 
 namespace scalable_ccd {
 
-using ArrayMax3 =
-    Eigen::Array<Scalar, Eigen::Dynamic, 1, Eigen::ColMajor, 3, 1>;
-
 /// @brief Axis aligned bounding-box of some type
 class AABB {
 public:

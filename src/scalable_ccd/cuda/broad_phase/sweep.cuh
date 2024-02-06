@@ -1,31 +1,11 @@
 #pragma once
 
-#include <scalable_ccd/cuda/types.cuh>
-#include <scalable_ccd/cuda/memory_handler.cuh>
+#include <scalable_ccd/cuda/memory_handler.hpp>
 #include <scalable_ccd/cuda/broad_phase/collision.cuh>
+#include <scalable_ccd/cuda/broad_phase/utils.cuh>
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
 
 namespace scalable_ccd::cuda {
-
-/// @brief
-/// @param boxes
-/// @param count
-/// @param overlaps
-/// @param num_boxes
-/// @param guess
-/// @param nbox
-/// @param start
-/// @param end
-/// @return
-__global__ void retrieve_collision_pairs(
-    const AABB* const boxes,
-    int* count,
-    int2* overlaps,
-    int num_boxes,
-    int guess,
-    int nbox,
-    int start = 0,
-    int end = INT_MAX);
 
 /// @brief Calculate the mean of the box centers
 /// @param boxes Pointer to the boxes

@@ -24,20 +24,6 @@ __device__ bool does_collide(const MiniBox& a, const MiniBox& b);
 __device__ bool covertex(const int3& a, const int3& b);
 
 /// @brief Add an overlap (xid, yid) to overlaps if there is enough space.
-/// Do not keep count of overlaps that do not fit.
-/// @param xid First box id
-/// @param yid Second box id
-/// @param max_overlap_size Maximum number of overlaps allocated
-/// @param overlaps Array of overlaps
-/// @param count Current number of overlaps in overlaps
-__device__ void add_overlap(
-    const int xid,
-    const int yid,
-    const int max_overlap_size,
-    int2* overlaps,
-    int* count);
-
-/// @brief Add an overlap (xid, yid) to overlaps if there is enough space.
 /// Keep count of overlaps that do not fit.
 /// @param xid First box id
 /// @param yid Second box id

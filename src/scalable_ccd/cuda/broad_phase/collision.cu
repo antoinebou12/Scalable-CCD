@@ -26,20 +26,6 @@ __device__ bool covertex(const int3& a, const int3& b)
 __device__ void add_overlap(
     const int xid,
     const int yid,
-    const int max_overlap_size,
-    int2* overlaps,
-    int* count)
-{
-    int i = atomicAdd(count, 1);
-
-    if (i < max_overlap_size) {
-        overlaps[i] = make_int2(xid, yid);
-    }
-}
-
-__device__ void add_overlap(
-    const int xid,
-    const int yid,
     RawDeviceBuffer<int2>& overlaps,
     int& real_count)
 {

@@ -1,10 +1,10 @@
 set(SOURCES
   ipc_ccd_strategy.cu
   ipc_ccd_strategy.hpp
-  memory_handler.cuh
+  memory_handler.cpp
+  memory_handler.hpp
   scalar.cu
   scalar.cuh
-  types.cuh
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" FILES ${SOURCES})

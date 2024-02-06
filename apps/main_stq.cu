@@ -2,7 +2,7 @@
 #include "ground_truth.hpp"
 
 #include <scalable_ccd/scalar.hpp>
-#include <scalable_ccd/cuda/memory_handler.cuh>
+#include <scalable_ccd/cuda/memory_handler.hpp>
 #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/cuda/broad_phase/utils.cuh>
 #include <scalable_ccd/cuda/narrow_phase/narrow_phase.cuh>
@@ -111,7 +111,7 @@ int main(int argc, char** argv)
     r.j_object["toi"] = toi;
     r.Print();
     // r.Print();
-    // std::cout << r.j_object["run_memory_pool_ccd (narrowphase)"];
+    // std::cout << r.j_object["run_ccd (narrowphase)"];
 
     // std::cout << "result_list " << result_list.size() << std::endl;
     // for (int i = 0; i < result_list.size(); i++)

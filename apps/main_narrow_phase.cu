@@ -1,7 +1,7 @@
 #include "io.hpp"
 #include "ground_truth.hpp"
 
-#include <scalable_ccd/cuda/memory_handler.cuh>
+#include <scalable_ccd/cuda/memory_handler.hpp>
 #include <scalable_ccd/cuda/broad_phase/broad_phase.cuh>
 #include <scalable_ccd/cuda/broad_phase/utils.cuh>
 #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
