@@ -1,8 +1,8 @@
 #include "memory_handler.hpp"
 
 #include <scalable_ccd/config.hpp>
-#include <scalable_ccd/cuda/narrow_phase/ccd_config.cuh>
-#include <scalable_ccd/cuda/narrow_phase/interval.cuh>
+// #include <scalable_ccd/cuda/narrow_phase/ccd_config.cuh>
+// #include <scalable_ccd/cuda/narrow_phase/interval.cuh>
 #include <scalable_ccd/cuda/utils/assert.cuh>
 #include <scalable_ccd/utils/logger.hpp>
 
@@ -94,10 +94,10 @@ void MemoryHandler::handleNarrowPhase(size_t& nbr)
         return;
     }
 
-    constraint += sizeof(CCDDomain) * nbr;
+    constraint += sizeof(MP_unit) * nbr;
     if (allocatable <= constraint) {
         MAX_UNIT_SIZE = (allocatable - sizeof(CCDConfig))
-            / (sizeof(CCDData) + sizeof(CCDDomain));
+            / (sizeof(CCDData) + sizeof(MP_unit));
         logger().warn(
             "Insufficient memory for MP units (requires {:g} GB); shrinking max unit size to {:d}",
             constraint / 1e9, MAX_UNIT_SIZE);
@@ -107,11 +107,10 @@ void MemoryHandler::handleNarrowPhase(size_t& nbr)
 
     // we are ok if we made it here
 
-    const size_t available_units =
-        (allocatable - constraint) / sizeof(CCDDomain);
+    const size_t available_units = (allocatable - constraint) / sizeof(MP_unit);
     logger().trace(
         "Can allocate {:d} ({:g} GB) units", available_units,
-        available_units * sizeof(CCDDomain) / 1e9);
+        available_units * sizeof(MP_unit) / 1e9);
 
     MAX_UNIT_SIZE = std::min(available_units, 2 * nbr);
     logger().trace("Setting a max unit size to {:d}", MAX_UNIT_SIZE);
@@ -124,7 +123,7 @@ void MemoryHandler::handleNarrowPhase(size_t& nbr)
 void MemoryHandler::handleOverflow(size_t& nbr)
 {
     const size_t allocatable = __getAllocatable();
-    size_t constraint = 2 * sizeof(CCDDomain) * MAX_UNIT_SIZE
+    size_t constraint = 2 * sizeof(MP_unit) * MAX_UNIT_SIZE
         + sizeof(CCDData) * nbr + sizeof(CCDConfig);
 
     if (allocatable > constraint) {
@@ -134,8 +133,8 @@ void MemoryHandler::handleOverflow(size_t& nbr)
         while (allocatable <= constraint) {
             MAX_QUERIES >>= 2;
             nbr = std::min(nbr, MAX_QUERIES);
-            constraint = sizeof(CCDDomain) * MAX_UNIT_SIZE
-                + sizeof(CCDData) * nbr + sizeof(CCDConfig);
+            constraint = sizeof(MP_unit) * MAX_UNIT_SIZE + sizeof(CCDData) * nbr
+                + sizeof(CCDConfig);
         }
         logger().debug("Overflow: reducing # of queries to {:d}", MAX_QUERIES);
     }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <scalable_ccd/cuda/narrow_phase/ccd_data.cuh>
+#include <scalable_ccd/cuda/types.cuh>
 
 namespace scalable_ccd::cuda {
 

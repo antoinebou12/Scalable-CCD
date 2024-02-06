@@ -1,8 +1,8 @@
 #include "root_finder.cuh"
 
 #include <scalable_ccd/config.hpp>
-#include <scalable_ccd/cuda/utils/limits.cuh>
 #include <scalable_ccd/utils/logger.hpp>
+#include <scalable_ccd/cuda/utils/assert.cuh>
 
 #include <array>
 #include <vector>
@@ -365,12 +365,12 @@ inline __device__ bool Origin_in_vf_inclusion_function_memory_pool(
     box_in = true;
     true_tol = 0.0;
     BoxPrimatives bp;
-    Scalar vmin = ::cuda::numeric_limits<Scalar>::max();
-    Scalar vmax = -::cuda::numeric_limits<Scalar>::max();
+    Scalar vmin = SCALAR_MAX;
+    Scalar vmax = -SCALAR_MAX;
     Scalar value;
     for (bp.dim = 0; bp.dim < 3; bp.dim++) {
-        vmin = ::cuda::numeric_limits<Scalar>::max();
-        vmax = -::cuda::numeric_limits<Scalar>::max();
+        vmin = SCALAR_MAX;
+        vmax = -SCALAR_MAX;
         for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
                 for (int k = 0; k < 2; k++) {
@@ -407,12 +407,12 @@ inline __device__ bool Origin_in_ee_inclusion_function_memory_pool(
     box_in = true;
     true_tol = 0.0;
     BoxPrimatives bp;
-    Scalar vmin = ::cuda::numeric_limits<Scalar>::max();
-    Scalar vmax = -::cuda::numeric_limits<Scalar>::max();
+    Scalar vmin = SCALAR_MAX;
+    Scalar vmax = -SCALAR_MAX;
     Scalar value;
     for (bp.dim = 0; bp.dim < 3; bp.dim++) {
-        vmin = ::cuda::numeric_limits<Scalar>::max();
-        vmax = -::cuda::numeric_limits<Scalar>::max();
+        vmin = SCALAR_MAX;
+        vmax = -SCALAR_MAX;
         for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
                 for (int k = 0; k < 2; k++) {

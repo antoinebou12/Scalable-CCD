@@ -7,8 +7,6 @@
 
 namespace scalable_ccd::cuda {
 
-enum Dimension { x, y, z };
-
 struct Interval {
     __device__ Interval() {};
 

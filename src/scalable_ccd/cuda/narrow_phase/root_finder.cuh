@@ -1,6 +1,6 @@
 #pragma once
 
-#include <scalable_ccd/cuda/memory_handler.cuh>
+#include <scalable_ccd/cuda/memory_handler.hpp>
 
 #include <thrust/device_vector.h>
 
