@@ -212,13 +212,15 @@ void run_narrow_phase(
             logger().trace(
                 "Running memory-pooled CCD using {:d} threads", parallel);
             {
-                SCALABLE_CCD_GPU_PROFILE_POINT(
-                    "run_memory_pool_ccd (narrowphase)");
+                SCALABLE_CCD_GPU_PROFILE_POINT("run_ccd (narrowphase)");
 
-                overflowed = run_memory_pool_ccd(
-                    d_vf_data_list, memory_handler, /*is_edge_edge=*/false,
-                    result_list, parallel, max_iter, tol, use_ms,
-                    allow_zero_toi, toi);
+                overflowed = run_ccd</*is_vf=*/true>(
+                    d_vf_data_list, memory_handler, parallel, max_iter, tol,
+                    use_ms, allow_zero_toi,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+                    result_list,
+#endif
+                    toi);
 
                 gpuErrchk(cudaDeviceSynchronize());
             }
@@ -233,13 +235,15 @@ void run_narrow_phase(
             logger().debug("ToI after FV: {:e}", toi);
 
             {
-                SCALABLE_CCD_GPU_PROFILE_POINT(
-                    "run_memory_pool_ccd (narrowphase)");
+                SCALABLE_CCD_GPU_PROFILE_POINT("run_ccd (narrowphase)");
 
-                overflowed = run_memory_pool_ccd(
-                    d_ee_data_list, memory_handler, /*is_edge_edge=*/true,
-                    result_list, parallel, max_iter, tol, use_ms,
-                    allow_zero_toi, toi);
+                overflowed = run_ccd</*is_vf=*/false>(
+                    d_ee_data_list, memory_handler, parallel, max_iter, tol,
+                    use_ms, allow_zero_toi,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+                    result_list,
+#endif
+                    toi);
 
                 gpuErrchk(cudaDeviceSynchronize());
             }

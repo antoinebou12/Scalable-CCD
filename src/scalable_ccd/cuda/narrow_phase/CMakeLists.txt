@@ -1,4 +1,8 @@
 set(SOURCES
+    ccd_buffer.cuh
+    ccd_config.cuh
+    ccd_data.cuh
+    interval.cuh
     narrow_phase.cu
     narrow_phase.cuh
     root_finder.cu

@@ -40,14 +40,11 @@ struct CCDBuffer {
 
     __device__ void update_starting_size()
     {
-        m_head += m_starting_size;
-        m_head %= m_capacity;
         if (m_head <= m_tail) {
             m_starting_size = m_tail - m_head;
         } else {
             m_starting_size = m_capacity - m_head + m_tail;
         }
-        assert(m_starting_size >= 0);
     }
 
     __device__ unsigned starting_size() const { return m_starting_size; }

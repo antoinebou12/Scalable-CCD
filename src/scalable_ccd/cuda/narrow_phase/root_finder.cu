@@ -1,971 +1,492 @@
 #include "root_finder.cuh"
 
 #include <scalable_ccd/config.hpp>
-#include <scalable_ccd/utils/logger.hpp>
+#include <scalable_ccd/cuda/narrow_phase/ccd_buffer.cuh>
+#include <scalable_ccd/cuda/narrow_phase/ccd_config.cuh>
+#include <scalable_ccd/cuda/narrow_phase/ccd_data.cuh>
+#include <scalable_ccd/cuda/narrow_phase/interval.cuh>
 #include <scalable_ccd/cuda/utils/assert.cuh>
 #include <scalable_ccd/cuda/utils/atomic_min_float.cuh>
+#include <scalable_ccd/cuda/utils/device_variable.cuh>
+#include <scalable_ccd/utils/logger.hpp>
 
-#include <array>
 #include <vector>
-
-using namespace std;
 
 namespace scalable_ccd::cuda {
 
-__device__ bool sum_no_larger_1(const Scalar& num1, const Scalar& num2)
-{
-#ifdef SCALABLE_CCD_USE_DOUBLE
-    if (num1 + num2 > 1 / (1 - DBL_EPSILON)) {
-        return false;
-    }
-#else
-    if (num1 + num2 > 1 / (1 - FLT_EPSILON)) {
-        return false;
-    }
-#endif
-    return true;
-}
+namespace {
+    // Allocate this in constant memory for faster access
+    __device__ __constant__ CCDConfig CONFIG;
 
-__device__ void compute_face_vertex_tolerance_memory_pool(
-    CCDData& data_in, const CCDConfig& config)
-{
-    Scalar p000[3], p001[3], p011[3], p010[3], p100[3], p101[3], p111[3],
-        p110[3];
-    for (int i = 0; i < 3; i++) {
-        p000[i] = data_in.v0s[i] - data_in.v1s[i];
-        p001[i] = data_in.v0s[i] - data_in.v3s[i];
-        p011[i] =
-            data_in.v0s[i] - (data_in.v2s[i] + data_in.v3s[i] - data_in.v1s[i]);
-        p010[i] = data_in.v0s[i] - data_in.v2s[i];
-        p100[i] = data_in.v0e[i] - data_in.v1e[i];
-        p101[i] = data_in.v0e[i] - data_in.v3e[i];
-        p111[i] =
-            data_in.v0e[i] - (data_in.v2e[i] + data_in.v3e[i] - data_in.v1e[i]);
-        p110[i] = data_in.v0e[i] - data_in.v2e[i];
-    }
-    Scalar dl = 0;
-    for (int i = 0; i < 3; i++) {
-        dl = max(dl, fabs(p100[i] - p000[i]));
-        dl = max(dl, fabs(p101[i] - p001[i]));
-        dl = max(dl, fabs(p111[i] - p011[i]));
-        dl = max(dl, fabs(p110[i] - p010[i]));
-    }
-    dl *= 3;
-    data_in.tol[0] = config.co_domain_tolerance / dl;
-
-    dl = 0;
-    for (int i = 0; i < 3; i++) {
-        dl = max(dl, fabs(p010[i] - p000[i]));
-        dl = max(dl, fabs(p110[i] - p100[i]));
-        dl = max(dl, fabs(p111[i] - p101[i]));
-        dl = max(dl, fabs(p011[i] - p001[i]));
-    }
-    dl *= 3;
-    data_in.tol[1] = config.co_domain_tolerance / dl;
-
-    dl = 0;
-    for (int i = 0; i < 3; i++) {
-        dl = max(dl, fabs(p001[i] - p000[i]));
-        dl = max(dl, fabs(p101[i] - p100[i]));
-        dl = max(dl, fabs(p111[i] - p110[i]));
-        dl = max(dl, fabs(p011[i] - p010[i]));
-    }
-    dl *= 3;
-    data_in.tol[2] = config.co_domain_tolerance / dl;
-}
-__device__ void compute_edge_edge_tolerance_memory_pool(
-    CCDData& data_in, const CCDConfig& config)
-{
-    Scalar p000[3], p001[3], p011[3], p010[3], p100[3], p101[3], p111[3],
-        p110[3];
-    for (int i = 0; i < 3; i++) {
-        p000[i] = data_in.v0s[i] - data_in.v2s[i];
-        p001[i] = data_in.v0s[i] - data_in.v3s[i];
-        p011[i] = data_in.v1s[i] - data_in.v3s[i];
-        p010[i] = data_in.v1s[i] - data_in.v2s[i];
-        p100[i] = data_in.v0e[i] - data_in.v2e[i];
-        p101[i] = data_in.v0e[i] - data_in.v3e[i];
-        p111[i] = data_in.v1e[i] - data_in.v3e[i];
-        p110[i] = data_in.v1e[i] - data_in.v2e[i];
-    }
-    Scalar dl = 0;
-    for (int i = 0; i < 3; i++) {
-        dl = max(dl, fabs(p100[i] - p000[i]));
-        dl = max(dl, fabs(p101[i] - p001[i]));
-        dl = max(dl, fabs(p111[i] - p011[i]));
-        dl = max(dl, fabs(p110[i] - p010[i]));
-    }
-    dl *= 3;
-    data_in.tol[0] = config.co_domain_tolerance / dl;
-
-    dl = 0;
-    for (int i = 0; i < 3; i++) {
-        dl = max(dl, fabs(p010[i] - p000[i]));
-        dl = max(dl, fabs(p110[i] - p100[i]));
-        dl = max(dl, fabs(p111[i] - p101[i]));
-        dl = max(dl, fabs(p011[i] - p001[i]));
-    }
-    dl *= 3;
-    data_in.tol[1] = config.co_domain_tolerance / dl;
-
-    dl = 0;
-    for (int i = 0; i < 3; i++) {
-        dl = max(dl, fabs(p001[i] - p000[i]));
-        dl = max(dl, fabs(p101[i] - p100[i]));
-        dl = max(dl, fabs(p111[i] - p110[i]));
-        dl = max(dl, fabs(p011[i] - p010[i]));
-    }
-    dl *= 3;
-    data_in.tol[2] = config.co_domain_tolerance / dl;
-}
-
-std::array<Scalar, 3> get_numerical_error(
-    const std::vector<std::array<Scalar, 3>>& vertices,
-    const bool& check_vf,
-    const bool use_ms)
-{
-    Scalar eefilter;
-    Scalar vffilter;
-    if (!use_ms) {
-#ifdef SCALABLE_CCD_USE_DOUBLE
-        eefilter = 6.217248937900877e-15;
-        vffilter = 6.661338147750939e-15;
-#else
-        eefilter = 3.337861e-06;
-        vffilter = 3.576279e-06;
-#endif
-    } else // using minimum separation
+    __device__ inline bool
+    sum_less_than_one(const Scalar& num1, const Scalar& num2)
     {
 #ifdef SCALABLE_CCD_USE_DOUBLE
-        eefilter = 7.105427357601002e-15;
-        vffilter = 7.549516567451064e-15;
+        return num1 + num2 <= 1 / (1 - DBL_EPSILON);
 #else
-        eefilter = 3.814698e-06;
-        vffilter = 4.053116e-06;
+        return num1 + num2 <= 1 / (1 - FLT_EPSILON);
 #endif
     }
 
-    Scalar xmax = fabs(vertices[0][0]);
-    Scalar ymax = fabs(vertices[0][1]);
-    Scalar zmax = fabs(vertices[0][2]);
-    for (int i = 0; i < vertices.size(); i++) {
-        if (xmax < fabs(vertices[i][0])) {
-            xmax = fabs(vertices[i][0]);
+    __device__ inline Scalar max_Linf_4(
+        const Vector3& p1,
+        const Vector3& p2,
+        const Vector3& p3,
+        const Vector3& p4,
+        const Vector3& p1e,
+        const Vector3& p2e,
+        const Vector3& p3e,
+        const Vector3& p4e)
+    {
+        return max(
+            max((p1e - p1).lpNorm<Eigen::Infinity>(),
+                (p2e - p2).lpNorm<Eigen::Infinity>()),
+            max((p3e - p3).lpNorm<Eigen::Infinity>(),
+                (p4e - p4).lpNorm<Eigen::Infinity>()));
+    }
+
+    __device__ void compute_face_vertex_tolerance(CCDData& data_in)
+    {
+        const Vector3 p000 = data_in.v0s - data_in.v1s;
+        const Vector3 p001 = data_in.v0s - data_in.v3s;
+        const Vector3 p011 =
+            data_in.v0s - (data_in.v2s + data_in.v3s - data_in.v1s);
+        const Vector3 p010 = data_in.v0s - data_in.v2s;
+        const Vector3 p100 = data_in.v0e - data_in.v1e;
+        const Vector3 p101 = data_in.v0e - data_in.v3e;
+        const Vector3 p111 =
+            data_in.v0e - (data_in.v2e + data_in.v3e - data_in.v1e);
+        const Vector3 p110 = data_in.v0e - data_in.v2e;
+
+        data_in.tol[0] = CONFIG.co_domain_tolerance
+            / (3 * max_Linf_4(p000, p001, p011, p010, p100, p101, p111, p110));
+        data_in.tol[1] = CONFIG.co_domain_tolerance
+            / (3 * max_Linf_4(p000, p100, p101, p001, p010, p110, p111, p011));
+        data_in.tol[2] = CONFIG.co_domain_tolerance
+            / (3 * max_Linf_4(p000, p100, p110, p010, p001, p101, p111, p011));
+    }
+
+    __device__ void compute_edge_edge_tolerance(CCDData& data_in)
+    {
+        // WARNING: This differs from the original implementation in
+        // Tight-Inclusion! This may be a bug, but results in better accuracy.
+        const Vector3 p000 = data_in.v0s - data_in.v2s;
+        const Vector3 p001 = data_in.v0s - data_in.v3s;
+        const Vector3 p010 = data_in.v1s - data_in.v2s;
+        const Vector3 p011 = data_in.v1s - data_in.v3s;
+        const Vector3 p100 = data_in.v0e - data_in.v2e;
+        const Vector3 p101 = data_in.v0e - data_in.v3e;
+        const Vector3 p110 = data_in.v1e - data_in.v2e;
+        const Vector3 p111 = data_in.v1e - data_in.v3e;
+
+        data_in.tol[0] = CONFIG.co_domain_tolerance
+            / (3 * max_Linf_4(p000, p001, p011, p010, p100, p101, p111, p110));
+        data_in.tol[1] = CONFIG.co_domain_tolerance
+            / (3 * max_Linf_4(p000, p001, p011, p010, p100, p101, p111, p110));
+        data_in.tol[2] = CONFIG.co_domain_tolerance
+            / (3 * max_Linf_4(p000, p100, p101, p001, p010, p110, p111, p011));
+    }
+
+    template <bool is_vf>
+    __device__ __host__ void get_numerical_error(CCDData& data_in, bool use_ms)
+    {
+        Scalar filter;
+        if (!use_ms) {
+#ifdef SCALABLE_CCD_USE_DOUBLE
+            if constexpr (is_vf) {
+                filter = 6.661338147750939e-15;
+            } else {
+                filter = 6.217248937900877e-15;
+            }
+#else
+            if constexpr (is_vf) {
+                filter = 3.576279e-06;
+            } else {
+                filter = 3.337861e-06;
+            }
+#endif
+        } else {
+#ifdef SCALABLE_CCD_USE_DOUBLE
+            if constexpr (is_vf) {
+                filter = 7.549516567451064e-15;
+            } else {
+                filter = 7.105427357601002e-15;
+            }
+#else
+            if constexpr (is_vf) {
+                filter = 4.053116e-06;
+            } else {
+                filter = 3.814698e-06;
+            }
+#endif
         }
-        if (ymax < fabs(vertices[i][1])) {
-            ymax = fabs(vertices[i][1]);
-        }
-        if (zmax < fabs(vertices[i][2])) {
-            zmax = fabs(vertices[i][2]);
-        }
+
+        const Vector3 max = data_in.v0s.cwiseAbs()
+                                .cwiseMax(data_in.v1s.cwiseAbs())
+                                .cwiseMax(data_in.v2s.cwiseAbs())
+                                .cwiseMax(data_in.v3s.cwiseAbs())
+                                .cwiseMax(data_in.v0e.cwiseAbs())
+                                .cwiseMax(data_in.v1e.cwiseAbs())
+                                .cwiseMax(data_in.v2e.cwiseAbs())
+                                .cwiseMax(data_in.v3e.cwiseAbs())
+                                .cwiseMax(Vector3::Ones());
+
+        data_in.err = max.array() * max.array() * max.array() * filter;
     }
-    Scalar delta_x = xmax > 1 ? xmax : 1;
-    Scalar delta_y = ymax > 1 ? ymax : 1;
-    Scalar delta_z = zmax > 1 ? zmax : 1;
-    std::array<Scalar, 3> result;
-    if (!check_vf) {
-        result[0] = delta_x * delta_x * delta_x * eefilter;
-        result[1] = delta_y * delta_y * delta_y * eefilter;
-        result[2] = delta_z * delta_z * delta_z * eefilter;
-    } else {
-        result[0] = delta_x * delta_x * delta_x * vffilter;
-        result[1] = delta_y * delta_y * delta_y * vffilter;
-        result[2] = delta_z * delta_z * delta_z * vffilter;
+
+    __device__ Scalar
+    calculate_vf(const CCDData& data_in, const BoxPrimatives& bp)
+    {
+        const Scalar v = (data_in.v0e[bp.dim] - data_in.v0s[bp.dim]) * bp.t
+            + data_in.v0s[bp.dim];
+        const Scalar t0 = (data_in.v1e[bp.dim] - data_in.v1s[bp.dim]) * bp.t
+            + data_in.v1s[bp.dim];
+        const Scalar t1 = (data_in.v2e[bp.dim] - data_in.v2s[bp.dim]) * bp.t
+            + data_in.v2s[bp.dim];
+        const Scalar t2 = (data_in.v3e[bp.dim] - data_in.v3s[bp.dim]) * bp.t
+            + data_in.v3s[bp.dim];
+        return v - (t1 - t0) * bp.u - (t2 - t0) * bp.v - t0;
     }
-    return result;
-}
 
-__device__ __host__ void
-get_numerical_error_vf_memory_pool(CCDData& data_in, bool use_ms)
-{
-    Scalar vffilter;
-    //   bool use_ms = false;
-    if (!use_ms) {
-#ifdef SCALABLE_CCD_USE_DOUBLE
-        vffilter = 6.661338147750939e-15;
-#else
-        vffilter = 3.576279e-06;
-#endif
-    } else {
-#ifdef SCALABLE_CCD_USE_DOUBLE
-        vffilter = 7.549516567451064e-15;
-#else
-        vffilter = 4.053116e-06;
-#endif
+    __device__ Scalar
+    calculate_ee(const CCDData& data_in, const BoxPrimatives& bp)
+    {
+        const Scalar ea0 = (data_in.v0e[bp.dim] - data_in.v0s[bp.dim]) * bp.t
+            + data_in.v0s[bp.dim];
+        const Scalar ea1 = (data_in.v1e[bp.dim] - data_in.v1s[bp.dim]) * bp.t
+            + data_in.v1s[bp.dim];
+        const Scalar eb0 = (data_in.v2e[bp.dim] - data_in.v2s[bp.dim]) * bp.t
+            + data_in.v2s[bp.dim];
+        const Scalar eb1 = (data_in.v3e[bp.dim] - data_in.v3s[bp.dim]) * bp.t
+            + data_in.v3s[bp.dim];
+        return ((ea1 - ea0) * bp.u + ea0) - ((eb1 - eb0) * bp.v + eb0);
     }
-    Scalar xmax = fabs(data_in.v0s[0]);
-    Scalar ymax = fabs(data_in.v0s[1]);
-    Scalar zmax = fabs(data_in.v0s[2]);
 
-    xmax = max(xmax, fabs(data_in.v1s[0]));
-    ymax = max(ymax, fabs(data_in.v1s[1]));
-    zmax = max(zmax, fabs(data_in.v1s[2]));
+    template <bool is_vf>
+    __device__ bool origin_in_inclusion_function(
+        const CCDData& data_in,
+        const CCDDomain& domain,
+        Scalar& true_tol,
+        bool& box_in)
+    {
+        box_in = true;
+        true_tol = 0.0;
+        BoxPrimatives bp;
+        Scalar vmin = SCALAR_MAX;
+        Scalar vmax = -SCALAR_MAX;
+        for (bp.dim = 0; bp.dim < 3; bp.dim++) {
+            vmin = SCALAR_MAX;
+            vmax = -SCALAR_MAX;
+            for (int i = 0; i < 2; i++) {
+                for (int j = 0; j < 2; j++) {
+                    for (int k = 0; k < 2; k++) {
+                        bp.b[0] = i;
+                        bp.b[1] = j;
+                        bp.b[2] = k;
+                        bp.calculate_tuv(domain);
 
-    xmax = max(xmax, fabs(data_in.v2s[0]));
-    ymax = max(ymax, fabs(data_in.v2s[1]));
-    zmax = max(zmax, fabs(data_in.v2s[2]));
+                        Scalar value;
+                        if constexpr (is_vf) {
+                            value = calculate_vf(data_in, bp);
+                        } else {
+                            value = calculate_ee(data_in, bp);
+                        }
 
-    xmax = max(xmax, fabs(data_in.v3s[0]));
-    ymax = max(ymax, fabs(data_in.v3s[1]));
-    zmax = max(zmax, fabs(data_in.v3s[2]));
-
-    xmax = max(xmax, fabs(data_in.v0e[0]));
-    ymax = max(ymax, fabs(data_in.v0e[1]));
-    zmax = max(zmax, fabs(data_in.v0e[2]));
-
-    xmax = max(xmax, fabs(data_in.v1e[0]));
-    ymax = max(ymax, fabs(data_in.v1e[1]));
-    zmax = max(zmax, fabs(data_in.v1e[2]));
-
-    xmax = max(xmax, fabs(data_in.v2e[0]));
-    ymax = max(ymax, fabs(data_in.v2e[1]));
-    zmax = max(zmax, fabs(data_in.v2e[2]));
-
-    xmax = max(xmax, fabs(data_in.v3e[0]));
-    ymax = max(ymax, fabs(data_in.v3e[1]));
-    zmax = max(zmax, fabs(data_in.v3e[2]));
-
-    xmax = max(xmax, Scalar(1));
-    ymax = max(ymax, Scalar(1));
-    zmax = max(zmax, Scalar(1));
-
-    data_in.err[0] = xmax * xmax * xmax * vffilter;
-    data_in.err[1] = ymax * ymax * ymax * vffilter;
-    data_in.err[2] = zmax * zmax * zmax * vffilter;
-    return;
-}
-
-__device__ __host__ void
-get_numerical_error_ee_memory_pool(CCDData& data_in, bool use_ms)
-{
-    Scalar vffilter;
-    //   bool use_ms = false;
-    if (!use_ms) {
-
-#ifdef SCALABLE_CCD_USE_DOUBLE
-        vffilter = 6.217248937900877e-15;
-#else
-        vffilter = 3.337861e-06;
-#endif
-    } else {
-#ifdef SCALABLE_CCD_USE_DOUBLE
-        vffilter = 7.105427357601002e-15;
-#else
-        vffilter = 3.814698e-06;
-#endif
-    }
-    Scalar xmax = fabs(data_in.v0s[0]);
-    Scalar ymax = fabs(data_in.v0s[1]);
-    Scalar zmax = fabs(data_in.v0s[2]);
-
-    xmax = max(xmax, fabs(data_in.v1s[0]));
-    ymax = max(ymax, fabs(data_in.v1s[1]));
-    zmax = max(zmax, fabs(data_in.v1s[2]));
-
-    xmax = max(xmax, fabs(data_in.v2s[0]));
-    ymax = max(ymax, fabs(data_in.v2s[1]));
-    zmax = max(zmax, fabs(data_in.v2s[2]));
-
-    xmax = max(xmax, fabs(data_in.v3s[0]));
-    ymax = max(ymax, fabs(data_in.v3s[1]));
-    zmax = max(zmax, fabs(data_in.v3s[2]));
-
-    xmax = max(xmax, fabs(data_in.v0e[0]));
-    ymax = max(ymax, fabs(data_in.v0e[1]));
-    zmax = max(zmax, fabs(data_in.v0e[2]));
-
-    xmax = max(xmax, fabs(data_in.v1e[0]));
-    ymax = max(ymax, fabs(data_in.v1e[1]));
-    zmax = max(zmax, fabs(data_in.v1e[2]));
-
-    xmax = max(xmax, fabs(data_in.v2e[0]));
-    ymax = max(ymax, fabs(data_in.v2e[1]));
-    zmax = max(zmax, fabs(data_in.v2e[2]));
-
-    xmax = max(xmax, fabs(data_in.v3e[0]));
-    ymax = max(ymax, fabs(data_in.v3e[1]));
-    zmax = max(zmax, fabs(data_in.v3e[2]));
-
-    xmax = max(xmax, Scalar(1));
-    ymax = max(ymax, Scalar(1));
-    zmax = max(zmax, Scalar(1));
-
-    data_in.err[0] = xmax * xmax * xmax * vffilter;
-    data_in.err[1] = ymax * ymax * ymax * vffilter;
-    data_in.err[2] = zmax * zmax * zmax * vffilter;
-    return;
-}
-
-__device__ Scalar calculate_vf(const CCDData& data_in, const BoxPrimatives& bp)
-{
-    Scalar v, pt, t0, t1, t2;
-    v = (data_in.v0e[bp.dim] - data_in.v0s[bp.dim]) * bp.t
-        + data_in.v0s[bp.dim];
-    t0 = (data_in.v1e[bp.dim] - data_in.v1s[bp.dim]) * bp.t
-        + data_in.v1s[bp.dim];
-    t1 = (data_in.v2e[bp.dim] - data_in.v2s[bp.dim]) * bp.t
-        + data_in.v2s[bp.dim];
-    t2 = (data_in.v3e[bp.dim] - data_in.v3s[bp.dim]) * bp.t
-        + data_in.v3s[bp.dim];
-    pt = (t1 - t0) * bp.u + (t2 - t0) * bp.v + t0;
-    return (v - pt);
-}
-
-__device__ Scalar calculate_ee(const CCDData& data_in, const BoxPrimatives& bp)
-{
-    Scalar edge0_vertex0 = (data_in.v0e[bp.dim] - data_in.v0s[bp.dim]) * bp.t
-        + data_in.v0s[bp.dim];
-    Scalar edge0_vertex1 = (data_in.v1e[bp.dim] - data_in.v1s[bp.dim]) * bp.t
-        + data_in.v1s[bp.dim];
-    Scalar edge1_vertex0 = (data_in.v2e[bp.dim] - data_in.v2s[bp.dim]) * bp.t
-        + data_in.v2s[bp.dim];
-    Scalar edge1_vertex1 = (data_in.v3e[bp.dim] - data_in.v3s[bp.dim]) * bp.t
-        + data_in.v3s[bp.dim];
-    Scalar result = ((edge0_vertex1 - edge0_vertex0) * bp.u + edge0_vertex0)
-        - ((edge1_vertex1 - edge1_vertex0) * bp.v + edge1_vertex0);
-
-    return result;
-}
-
-inline __device__ bool Origin_in_vf_inclusion_function_memory_pool(
-    const CCDData& data_in, CCDDomain& unit, Scalar& true_tol, bool& box_in)
-{
-    box_in = true;
-    true_tol = 0.0;
-    BoxPrimatives bp;
-    Scalar vmin = SCALAR_MAX;
-    Scalar vmax = -SCALAR_MAX;
-    Scalar value;
-    for (bp.dim = 0; bp.dim < 3; bp.dim++) {
-        vmin = SCALAR_MAX;
-        vmax = -SCALAR_MAX;
-        for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < 2; j++) {
-                for (int k = 0; k < 2; k++) {
-                    bp.b[0] = i;
-                    bp.b[1] = j;
-                    bp.b[2] = k; // 100
-                    bp.calculate_tuv(unit);
-                    value = calculate_vf(data_in, bp);
-                    vmin = min(vmin, value);
-                    vmax = max(vmax, value);
+                        vmin = min(vmin, value);
+                        vmax = max(vmax, value);
+                    }
                 }
+            }
+
+            // get the min and max in one dimension
+            true_tol = max(true_tol, vmax - vmin);
+
+            if (vmin - data_in.ms > data_in.err[bp.dim]
+                || vmax + data_in.ms < -data_in.err[bp.dim]) {
+                return false;
+            }
+
+            if (vmin + data_in.ms < -data_in.err[bp.dim]
+                || vmax - data_in.ms > data_in.err[bp.dim]) {
+                box_in = false;
+            }
+        }
+        return true;
+    }
+
+    __device__ int split_dimension(const CCDData& data, Array3 width)
+    {
+        const Array3 res = width / data.tol;
+        if (res[0] >= res[1] && res[0] >= res[2]) {
+            return 0;
+        } else if (res[1] >= res[0] && res[1] >= res[2]) {
+            return 1;
+        } else {
+            assert(res[2] >= res[0] && res[2] >= res[1]);
+            return 2;
+        }
+    }
+
+    template <bool is_vf>
+    __device__ inline bool bisect(
+        const CCDDomain& domain,
+        const int split,
+        const Scalar* const toi,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+        Scalar data_toi,
+#endif
+        CCDBuffer* const buffer)
+    {
+        const ::cuda::std::array<Interval, 2> halves =
+            domain.tuv[split].split();
+
+        if (halves[0].lower >= halves[0].upper
+            || halves[1].lower >= halves[1].upper) {
+            return true;
+        }
+
+        buffer->push(domain).tuv[split] = halves[0];
+
+        if (split == 0) {
+            if (halves[1].lower <= *toi) {
+                buffer->push(domain).tuv[0] = halves[1];
+            }
+        } else {
+            if constexpr (is_vf) {
+                if (split == 1) {
+                    // check if u+v<=1
+                    if (sum_less_than_one(
+                            halves[1].lower, domain.tuv[2].lower)) {
+                        buffer->push(domain).tuv[1] = halves[1];
+                    }
+                } else if (split == 2) {
+                    // check if u+v<=1
+                    if (sum_less_than_one(
+                            halves[1].lower, domain.tuv[1].lower)) {
+                        buffer->push(domain).tuv[2] = halves[1];
+                    }
+                }
+            } else {
+                buffer->push(domain).tuv[split] = halves[1];
             }
         }
 
-        // get the min and max in one dimension
-        true_tol = max(true_tol, vmax - vmin);
-
-        if (vmin - data_in.ms > data_in.err[bp.dim]
-            || vmax + data_in.ms < -data_in.err[bp.dim]) {
-            return false;
-        }
-
-        if (vmin + data_in.ms < -data_in.err[bp.dim]
-            || vmax - data_in.ms > data_in.err[bp.dim]) {
-            box_in = false;
-        }
+        return false;
     }
-    return true;
-}
 
-inline __device__ bool Origin_in_ee_inclusion_function_memory_pool(
-    const CCDData& data_in, CCDDomain& unit, Scalar& true_tol, bool& box_in)
-{
-    box_in = true;
-    true_tol = 0.0;
-    BoxPrimatives bp;
-    Scalar vmin = SCALAR_MAX;
-    Scalar vmax = -SCALAR_MAX;
-    Scalar value;
-    for (bp.dim = 0; bp.dim < 3; bp.dim++) {
-        vmin = SCALAR_MAX;
-        vmax = -SCALAR_MAX;
-        for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < 2; j++) {
-                for (int k = 0; k < 2; k++) {
-                    bp.b[0] = i;
-                    bp.b[1] = j;
-                    bp.b[2] = k; // 100
-                    bp.calculate_tuv(unit);
-                    value = calculate_ee(data_in, bp);
-                    vmin = min(vmin, value);
-                    vmax = max(vmax, value);
-                }
-            }
-        }
-
-        // get the min and max in one dimension
-        true_tol = max(true_tol, vmax - vmin);
-
-        if (vmin - data_in.ms > data_in.err[bp.dim]
-            || vmax + data_in.ms < -data_in.err[bp.dim]) {
-            return false;
-        }
-
-        if (vmin + data_in.ms < -data_in.err[bp.dim]
-            || vmax - data_in.ms > data_in.err[bp.dim]) {
-            box_in = false;
-        }
-    }
-    return true;
-}
+} // namespace
 
 // === the memory pool method =================================================
 
-__global__ void compute_vf_tolerance_memory_pool(
-    CCDData* data, CCDConfig* config, const int query_size)
+template <bool is_vf>
+__global__ void compute_tolerance(CCDData* data, const int query_size)
 {
     int tx = threadIdx.x + blockIdx.x * blockDim.x;
     if (tx >= query_size)
         return;
 
-    compute_face_vertex_tolerance_memory_pool(data[tx], config[0]);
-
-    data[tx].nbr_checks = 0;
-    get_numerical_error_vf_memory_pool(data[tx], config[0].use_ms);
-}
-
-__global__ void compute_ee_tolerance_memory_pool(
-    CCDData* data, CCDConfig* config, const int query_size)
-{
-    int tx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (tx >= query_size)
-        return;
-
-    compute_edge_edge_tolerance_memory_pool(data[tx], config[0]);
-
-    data[tx].nbr_checks = 0;
-    get_numerical_error_ee_memory_pool(data[tx], config[0].use_ms);
-}
-
-__global__ void initialize_memory_pool(CCDDomain* units, int query_size)
-{
-    int tx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (tx >= query_size)
-        return;
-    units[tx].init(tx);
-}
-__device__ int split_dimension_memory_pool(const CCDData& data, Scalar width[3])
-{ // clarified in queue.h
-    int split = 0;
-    Scalar res[3];
-    res[0] = width[0] / data.tol[0];
-    res[1] = width[1] / data.tol[1];
-    res[2] = width[2] / data.tol[2];
-    if (res[0] >= res[1] && res[0] >= res[2]) {
-        split = 0;
-    }
-    if (res[1] >= res[0] && res[1] >= res[2]) {
-        split = 1;
-    }
-    if (res[2] >= res[1] && res[2] >= res[0]) {
-        split = 2;
-    }
-    return split;
-}
-
-inline __device__ bool bisect_vf_memory_pool(
-    const CCDDomain& unit,
-    int split,
-    CCDConfig* config,
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-    Scalar data_toi,
-#endif
-    CCDDomain* out)
-{
-    const ::cuda::std::array<Interval, 2> halves = unit.tuv[split].split();
-
-    if (halves[0].lower >= halves[0].upper) {
-        // valid_nbr = 0;
-        return true;
-    }
-    if (halves[1].lower >= halves[1].upper) {
-        // valid_nbr = 0;
-        return true;
-    }
-    // bisected[0] = unit;
-    // bisected[1] = unit;
-    // valid_nbr = 1;
-
-    int unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
-    out[unit_id] = unit;
-    out[unit_id].tuv[split] = halves[0];
-
-    if (split == 0) {
-#ifndef SCALABLE_CCD_TOI_PER_QUERY
-        if (halves[1].lower <= config[0].toi) {
-#else
-        if (halves[1].lower <= data_toi) {
-#endif
-            unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
-            out[unit_id] = unit;
-            out[unit_id].tuv[split] = halves[1];
-        }
-    } else if (split == 1) {
-        // check if u+v<=1
-        if (sum_no_larger_1(halves[1].lower, unit.tuv[2].lower)) {
-            unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
-            out[unit_id] = unit;
-            out[unit_id].tuv[1] = halves[1];
-            // valid_nbr = 2;
-        }
-    } else if (split == 2) {
-        // check if u+v<=1
-        if (sum_no_larger_1(halves[1].lower, unit.tuv[1].lower)) {
-            unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
-            out[unit_id] = unit;
-            out[unit_id].tuv[2] = halves[1];
-            // valid_nbr = 2;
-        }
-    }
-    return false;
-}
-inline __device__ bool bisect_ee_memory_pool(
-    const CCDDomain& unit,
-    int split,
-    CCDConfig* config,
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-    Scalar data_toi,
-#endif
-    CCDDomain* out)
-{
-    const ::cuda::std::array<Interval, 2> halves = unit.tuv[split].split();
-
-    if (halves[0].lower >= halves[0].upper) {
-        // valid_nbr = 0;
-        return true;
-    }
-    if (halves[1].lower >= halves[1].upper) {
-        // valid_nbr = 0;
-        return true;
-    }
-    // bisected[0] = unit;
-    // bisected[1] = unit;
-    // valid_nbr = 1;
-
-    int unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
-    out[unit_id] = unit;
-    out[unit_id].tuv[split] = halves[0];
-
-    if (split == 0) // split the time interval
-    {
-#ifndef SCALABLE_CCD_TOI_PER_QUERY
-        if (halves[1].lower <= config[0].toi) {
-#else
-        if (halves[1].lower <= data_toi) {
-#endif
-            unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
-            out[unit_id] = unit;
-            out[unit_id].tuv[split] = halves[1];
-        }
+    if constexpr (is_vf) {
+        compute_face_vertex_tolerance(data[tx]);
     } else {
-
-        unit_id = atomicInc(&config[0].mp_end, config[0].unit_size - 1);
-        out[unit_id] = unit;
-        out[unit_id].tuv[split] = halves[1];
-        // valid_nbr = 2;
+        compute_edge_edge_tolerance(data[tx]);
     }
 
-    return false;
+    data[tx].nbr_checks = 0;
+    get_numerical_error<is_vf>(data[tx], CONFIG.use_ms);
 }
 
-__global__ void vf_ccd_memory_pool(
-    CCDDomain* units, int query_size, CCDData* data, CCDConfig* config)
+template <bool is_vf>
+__global__ void
+ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi)
 {
-    int tx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (tx >= config[0].mp_remaining)
+    const int tx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (tx >= buffer->starting_size())
         return;
 
-    //   bool allow_zero_toi = true;
-    int qid = (tx + config[0].mp_start) % config[0].unit_size;
-
-    Scalar widths[3];
-    bool condition;
-    // int split;
-
-    CCDDomain units_in = units[qid];
-    int box_id = units_in.query_id;
-    CCDData data_in = data[box_id];
-
+    const CCDDomain domain_in = buffer->pop();
+    const int box_id = domain_in.query_id;
+    const CCDData data_in = data[box_id];
     atomicAdd(&data[box_id].nbr_checks, 1);
 
-    const Scalar time_left = units_in.tuv[0].lower; // the time of this unit
+    const Scalar min_t = domain_in.tuv[0].lower; // the time of this domain
 
-// if the time is larger than toi, return
 #ifndef SCALABLE_CCD_TOI_PER_QUERY
-    if (time_left >= config[0].toi) {
+    // if the time is larger than toi, return
+    if (min_t >= *toi) {
+#else
+    if (min_t >= data_in.toi) {
+#endif
         return;
     }
-#else
-    if (time_left >= data_in.toi)
+
+    // Check if exceeds max checks
+    if (CONFIG.max_iter >= 0 && data_in.nbr_checks > CONFIG.max_iter) {
         return;
-#endif
-    // if (results[box_id] > 0)
-    // { // if it is sure that have root, then no need to check
-    // 	return;
+    }
+    // else if (buffer.mp_remaining > buffer->capacity() / 2) { // overflow
+    //     atomicCAS(&buffer->overflow_flag, 0, 1);
+    //     return;
     // }
-    if (config[0].max_iter >= 0
-        && data_in.nbr_checks > config[0].max_iter) // max checks
-    {
-        // if (!config[0].overflow_flag)
-        //   atomicAdd(&config[0].overflow_flag, 1);
-        return;
-    } else if (config[0].mp_remaining > config[0].unit_size / 2) // overflow
-    {
-        if (!config[0].overflow_flag)
-            atomicAdd(&config[0].overflow_flag, 1);
-        return;
-    }
 
-    Scalar true_tol = 0;
-    bool box_in;
+    Scalar true_tol = 0; // set by origin_in_inclusion_function
+    bool box_in;         // set by origin_in_inclusion_function
+    if (origin_in_inclusion_function<is_vf>(
+            data_in, domain_in, true_tol, box_in)) {
 
-    const bool zero_in = Origin_in_vf_inclusion_function_memory_pool(
-        data_in, units_in, true_tol, box_in);
-    if (zero_in) {
-        widths[0] = units_in.tuv[0].upper - units_in.tuv[0].lower;
-        widths[1] = units_in.tuv[1].upper - units_in.tuv[1].lower;
-        widths[2] = units_in.tuv[2].upper - units_in.tuv[2].lower;
+        const Array3 widths(
+            domain_in.tuv[0].upper - domain_in.tuv[0].lower,
+            domain_in.tuv[1].upper - domain_in.tuv[1].lower,
+            domain_in.tuv[2].upper - domain_in.tuv[2].lower);
 
-        // Condition 1
-        condition = widths[0] <= data_in.tol[0] && widths[1] <= data_in.tol[1]
-            && widths[2] <= data_in.tol[2];
-        if (condition) {
-            atomicMin(&config[0].toi, time_left);
-            // results[box_id] = 1;
-
+        // Condition 1: the domain is smaller than the tolerance.
+        if ((widths <= data_in.tol).all()) {
+            atomicMin(toi, min_t);
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, time_left);
-#endif
-            return;
-        }
-        // Condition 2, the box is inside the epsilon box, have a root, return
-        // true; condition = units_in.box_in;
-
-        if (box_in && (config[0].allow_zero_toi || time_left > 0)) {
-            atomicMin(&config[0].toi, time_left);
-            // results[box_id] = 1;
-
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, min_t);
 #endif
             return;
         }
 
-        // Condition 3, real tolerance is smaller than the input tolerance,
-        // return true
-        condition = true_tol <= config->co_domain_tolerance;
-        if (condition && (config[0].allow_zero_toi || time_left > 0)) {
-            atomicMin(&config[0].toi, time_left);
-            // results[box_id] = 1;
-
+        // Condition 2: the box is inside the epsilon box
+        if (box_in && (CONFIG.allow_zero_toi || min_t > 0)) {
+            atomicMin(toi, min_t);
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, min_t);
 #endif
             return;
         }
-        const int split = split_dimension_memory_pool(data_in, widths);
 
-#ifndef SCALABLE_CCD_TOI_PER_QUERY
-        const bool sure_in =
-            bisect_vf_memory_pool(units_in, split, config, units);
+        // Condition 3: real tolerance is smaller than the int tolerance
+        if (true_tol <= CONFIG.co_domain_tolerance
+            && (CONFIG.allow_zero_toi || min_t > 0)) {
+            atomicMin(toi, min_t);
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+            atomicMin(&data[box_id].toi, min_t);
+#endif
+            return;
+        }
+
+        // Get the next dimension to split
+        const int split = split_dimension(data_in, widths);
+
+        const bool sure_in = bisect<is_vf>(
+            domain_in, split,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+            &data_in.toi,
 #else
-        const bool sure_in =
-            bisect_vf_memory_pool(units_in, split, config, data_in.toi, units);
+            toi,
 #endif
+            buffer);
 
-        if (sure_in) // in this case, the interval is too small that overflow
-                     // happens. it should be rare to happen
-        {
-            atomicMin(&config[0].toi, time_left);
-            // results[box_id] = 1;
-
+        // Condition 4 (rare): the interval is too small that overflow happens
+        if (sure_in) {
+            atomicMin(toi, min_t);
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, time_left);
+            atomicMin(&data[box_id].toi, min_t);
 #endif
             return;
         }
     }
 }
-__global__ void ee_ccd_memory_pool(
-    CCDDomain* units, int query_size, CCDData* data, CCDConfig* config)
-{
-    //   bool allow_zero_toi = true;
 
-    int tx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (tx >= config[0].mp_remaining)
-        return;
-
-    int qid = (tx + config[0].mp_start) % config[0].unit_size;
-
-    Scalar widths[3];
-    bool condition;
-
-    CCDDomain units_in = units[qid];
-    int box_id = units_in.query_id;
-    CCDData data_in = data[box_id];
-
-    atomicAdd(&data[box_id].nbr_checks, 1);
-
-    const Scalar time_left = units_in.tuv[0].lower; // the time of this unit
-
-// if the time is larger than toi, return
-#ifndef SCALABLE_CCD_TOI_PER_QUERY
-    if (time_left >= config[0].toi) {
-        return;
-    }
-#else
-    if (time_left >= data_in.toi)
-        return;
-#endif
-    // if (results[box_id] > 0)
-    // { // if it is sure that have root, then no need to check
-    // 	return;
-    // }
-    if (config[0].max_iter >= 0
-        && data_in.nbr_checks > config[0].max_iter) // max checks
-    {
-        // if (!config[0].overflow_flag)
-        //   atomicAdd(&config[0].overflow_flag, 1);
-        return;
-    } else if (config[0].mp_remaining > config[0].unit_size / 2) // overflow
-    {
-        if (!config[0].overflow_flag)
-            atomicAdd(&config[0].overflow_flag, 1);
-        return;
-    }
-
-    Scalar true_tol = 0;
-    bool box_in;
-
-    const bool zero_in = Origin_in_ee_inclusion_function_memory_pool(
-        data_in, units_in, true_tol, box_in);
-    if (zero_in) {
-        widths[0] = units_in.tuv[0].upper - units_in.tuv[0].lower;
-        widths[1] = units_in.tuv[1].upper - units_in.tuv[1].lower;
-        widths[2] = units_in.tuv[2].upper - units_in.tuv[2].lower;
-
-        // Condition 1
-        condition = widths[0] <= data_in.tol[0] && widths[1] <= data_in.tol[1]
-            && widths[2] <= data_in.tol[2];
-        if (condition) {
-            atomicMin(&config[0].toi, time_left);
-            // results[box_id] = 1;
-
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, time_left);
-#endif
-            return;
-        }
-        // Condition 2, the box is inside the epsilon box, have a root, return
-        // true;
-        if (box_in && (config[0].allow_zero_toi || time_left > 0)) {
-            atomicMin(&config[0].toi, time_left);
-            // results[box_id] = 1;
-
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, time_left);
-#endif
-            return;
-        }
-
-        // Condition 3, real tolerance is smaller than the input tolerance,
-        // return true
-        condition = true_tol <= config->co_domain_tolerance;
-        if (condition && (config[0].allow_zero_toi || time_left > 0)) {
-            atomicMin(&config[0].toi, time_left);
-            // results[box_id] = 1;
-
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, time_left);
-#endif
-            return;
-        }
-        const int split = split_dimension_memory_pool(data_in, widths);
-
-#ifndef SCALABLE_CCD_TOI_PER_QUERY
-        const bool sure_in =
-            bisect_ee_memory_pool(units_in, split, config, units);
-#else
-        const bool sure_in =
-            bisect_ee_memory_pool(units_in, split, config, data_in.toi, units);
-#endif
-
-        if (sure_in) // in this case, the interval is too small that overflow
-                     // happens. it should be rare to happen
-        {
-            atomicMin(&config[0].toi, time_left);
-            // results[box_id] = 1;
-
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, time_left);
-#endif
-
-            return;
-        }
-    }
-}
-
-__global__ void shift_queue_pointers(CCDConfig* config)
-{
-    config[0].mp_start += config[0].mp_remaining;
-    config[0].mp_start = config[0].mp_start % config[0].unit_size;
-    config[0].mp_remaining = (config[0].mp_end - config[0].mp_start);
-    config[0].mp_remaining = config[0].mp_remaining < 0
-        ? config[0].mp_end + config[0].unit_size - config[0].mp_start
-        : config[0].mp_remaining;
-}
-
-bool run_memory_pool_ccd(
-    thrust::device_vector<CCDData>& d_data_list,
-    std::shared_ptr<MemoryHandler> memory_handler,
-    const bool is_edge,
-    std::vector<int>& result_list,
+template <bool is_vf>
+bool run_ccd(
+    thrust::device_vector<CCDData>& d_data,
+    const std::shared_ptr<MemoryHandler> memory_handler,
     const int parallel_nbr,
     const int max_iter,
     const Scalar tol,
     const bool use_ms,
     const bool allow_zero_toi,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+    std::vector<int>& result_list,
+#endif
     Scalar& toi)
 {
-    const int nbr = d_data_list.size();
+    const int nbr = d_data.size();
 
-    // memory_handler->setUnitSize(/*constraint=*/sizeof(CCDConfig));
+    CCDBuffer* d_buffer;
+    {
+        const size_t unit_size = memory_handler->MAX_UNIT_SIZE;
 
-    // int *res = new int[nbr];
-    CCDConfig* config = new CCDConfig[1];
-    // config[0].err_in[0] =
-    //     -1; // the input error bound calculate from the AABB of the whole
-    //     mesh
-    config[0].co_domain_tolerance = tol; // tolerance of the co-domain
-    // config[0].max_t = 1;                  // the upper bound of the time
+        logger().trace(
+            "CCD Buffer of size {:d} ({:g} GB)", unit_size,
+            sizeof(CCDDomain) * unit_size / 1e9);
 
-    // interval
-    config[0].toi = toi;
-    config[0].mp_end = nbr;
-    config[0].mp_start = 0;
-    config[0].mp_remaining = nbr;
-    config[0].overflow_flag = 0;
-    // config[0].unit_size = std::min(1024 * nbr, int(5e7)); // 2.0 * nbr;
-    config[0].unit_size = memory_handler->MAX_UNIT_SIZE;
-    config[0].use_ms = use_ms;
-    config[0].allow_zero_toi = allow_zero_toi;
-    config[0].max_iter = max_iter;
+        CCDBuffer buffer;
+        gpuErrchk(cudaMalloc(&buffer.m_data, sizeof(CCDDomain) * unit_size));
+        buffer.m_starting_size = nbr;
+        buffer.m_capacity = unit_size;
+        buffer.m_head = 0;
+        buffer.m_tail = nbr;
+        buffer.m_overflow_flag = 0;
 
-    // int *d_res;
-    CCDDomain* d_units;
-    CCDConfig* d_config;
+        gpuErrchk(cudaMalloc(&d_buffer, sizeof(CCDBuffer)));
+        gpuErrchk(cudaMemcpy(
+            d_buffer, &buffer, sizeof(CCDBuffer), cudaMemcpyHostToDevice));
 
-    size_t unit_size = sizeof(CCDDomain) * config[0].unit_size;
-    logger().debug("unit_size: {:d}", config[0].unit_size);
-    logger().debug("unit_size (bytes): {:d}", unit_size);
-    logger().debug(
-        "allocatable (bytes): {:d}", memory_handler->__getAllocatable());
-    // size_t result_size = sizeof(int) * nbr;
-
-    // cudaMalloc(&d_res, result_size);
-    gpuErrchk(cudaMalloc(&d_units, unit_size));
-    gpuErrchk(cudaMalloc(&d_config, sizeof(CCDConfig)));
-    gpuErrchk(cudaMemcpy(
-        d_config, config, sizeof(CCDConfig), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaGetLastError());
-    // Timer timer;
-    // timer.start();
-    logger().trace("nbr: {:d}, parallel_nbr: {:d}", nbr, parallel_nbr);
-    initialize_memory_pool<<<nbr / parallel_nbr + 1, parallel_nbr>>>(
-        d_units, nbr);
-    gpuErrchk(cudaDeviceSynchronize());
-
-    if (is_edge) {
-        compute_ee_tolerance_memory_pool<<<
-            nbr / parallel_nbr + 1, parallel_nbr>>>(
-            thrust::raw_pointer_cast(d_data_list.data()), d_config, nbr);
-    } else {
-        compute_vf_tolerance_memory_pool<<<
-            nbr / parallel_nbr + 1, parallel_nbr>>>(
-            thrust::raw_pointer_cast(d_data_list.data()), d_config, nbr);
+        initialize_buffer<<<nbr / parallel_nbr + 1, parallel_nbr>>>(d_buffer);
+        gpuErrchk(cudaDeviceSynchronize());
     }
+
+    // Initialize the global configuration variable
+    {
+        CCDConfig config;
+        config.co_domain_tolerance = tol;
+        config.use_ms = use_ms;
+        config.allow_zero_toi = allow_zero_toi;
+        config.max_iter = max_iter;
+        gpuErrchk(cudaMemcpyToSymbol(CONFIG, &config, sizeof(CCDConfig)));
+    }
+
+    DeviceVariable d_toi(toi);
+
+    // ---
+
+    compute_tolerance<is_vf><<<nbr / parallel_nbr + 1, parallel_nbr>>>(
+        thrust::raw_pointer_cast(d_data.data()), nbr);
     gpuErrchk(cudaDeviceSynchronize());
 
-    logger().trace("MAX_QUERIES: {:d}", memory_handler->MAX_QUERIES);
-    logger().trace("sizeof(Scalar) {:d}", sizeof(Scalar));
+    logger().trace("Max queries: {:d}", memory_handler->MAX_QUERIES);
 
     int nbr_per_loop = nbr;
-    // int start = 0;
-    // int end = 0;
-
     logger().trace("Queue size t0: {:d}", nbr_per_loop);
     while (nbr_per_loop > 0) {
-        if (is_edge) {
-            ee_ccd_memory_pool<<<
-                nbr_per_loop / parallel_nbr + 1, parallel_nbr>>>(
-                d_units, nbr, thrust::raw_pointer_cast(d_data_list.data()),
-                d_config);
-        } else {
-            vf_ccd_memory_pool<<<
-                nbr_per_loop / parallel_nbr + 1, parallel_nbr>>>(
-                d_units, nbr, thrust::raw_pointer_cast(d_data_list.data()),
-                d_config);
-        }
+        ccd_kernel<is_vf><<<nbr_per_loop / parallel_nbr + 1, parallel_nbr>>>(
+            d_buffer, thrust::raw_pointer_cast(d_data.data()), &d_toi);
         gpuErrchk(cudaDeviceSynchronize());
-        gpuErrchk(cudaGetLastError());
-        shift_queue_pointers<<<1, 1>>>(d_config);
-        gpuErrchk(cudaDeviceSynchronize());
-        gpuErrchk(cudaMemcpy(
-            &nbr_per_loop, &d_config[0].mp_remaining, sizeof(int),
-            cudaMemcpyDeviceToHost));
-        // cudaMemcpy(&start, &d_config[0].mp_start, sizeof(int),
-        //            cudaMemcpyDeviceToHost);
-        // cudaMemcpy(&end, &d_config[0].mp_end, sizeof(int),
-        // cudaMemcpyDeviceToHost); cudaMemcpy(&toi, &d_config[0].toi,
-        // sizeof(Scalar),
-        //            cudaMemcpyDeviceToHost);
-        // logger().trace("toi {}", toi);
-        // logger().trace("toi {:.4f}",  toi);
-        // logger().trace("Start {:d}, End {:d}, Queue size: {:d}",  start, end,
-        // nbr_per_loop);
-        gpuErrchk(cudaGetLastError());
-        logger().trace("Queue size: {:d}", nbr_per_loop);
-    }
-    cudaDeviceSynchronize();
-    // double tt = timer.getElapsedTimeInMicroSec();
-    // run_time += tt / 1000.0f;
-    gpuErrchk(cudaGetLastError());
 
-    // cudaMemcpy(res, d_res, result_size, cudaMemcpyDeviceToHost);
-    gpuErrchk(cudaMemcpy(
-        &toi, &d_config[0].toi, sizeof(Scalar), cudaMemcpyDeviceToHost));
+        update_buffer_size<<<1, 1>>>(d_buffer);
+        gpuErrchk(cudaDeviceSynchronize());
+
+        gpuErrchk(cudaMemcpy(
+            &nbr_per_loop, &(d_buffer->m_starting_size), sizeof(unsigned),
+            cudaMemcpyDeviceToHost));
+
+        logger().trace("Queue size: {:d}", nbr_per_loop);
+        logger().trace("toi={:g}", *d_toi);
+    }
+    gpuErrchk(cudaDeviceSynchronize());
+
+    toi = d_toi;
+
     int overflow;
     gpuErrchk(cudaMemcpy(
-        &overflow, &d_config[0].overflow_flag, sizeof(int),
+        &overflow, &(d_buffer->m_overflow_flag), sizeof(int),
         cudaMemcpyDeviceToHost));
     if (overflow) {
         return true;
     }
 
-    gpuErrchk(cudaFree(d_units));
-    gpuErrchk(cudaFree(d_config));
-
-    // for (size_t i = 0; i < nbr; i++) {
-    //   result_list[i] = res[i];
-    // }
-
-    // delete[] res;
-    delete[] config;
-    cudaError_t ct = cudaGetLastError();
-    logger().trace(
-        "\n******************\n{}\n******************", cudaGetErrorString(ct));
-
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-    CCDData* data_list = new CCDData[d_data_list.size()];
-    // CCDConfig *config = new CCDConfig[1];
+    CCDData* data_list = new CCDData[d_data.size()];
+    // CCDConfig CONFIG = new CCDConfig[1];
     gpuErrchk(cudaMemcpy(
-        data_list, d_data_list, sizeof(CCDData) * d_data_list.size(),
+        data_list, d_data, sizeof(CCDData) * d_data.size(),
         cudaMemcpyDeviceToHost));
     // std::vector<std::pair<std::string, std::string>> symbolic_tois;
     int tpq_cnt = 0;
-    for (size_t i = 0; i < d_data_list.size(); i++) {
+    for (size_t i = 0; i < d_data.size(); i++) {
         cuda::Rational ra(data_list[i].toi);
         if (data_list[i].toi > 1)
             continue;
@@ -1007,5 +528,32 @@ bool run_memory_pool_ccd(
 
     return false;
 }
+
+// === Template instantiation ==================================================
+
+template __global__ void compute_tolerance<false>(CCDData*, const int);
+template __global__ void compute_tolerance<true>(CCDData*, const int);
+
+template __global__ void
+ccd_kernel<false>(CCDBuffer* const, CCDData* const, Scalar* const);
+template __global__ void
+ccd_kernel<true>(CCDBuffer* const, CCDData* const, Scalar* const);
+
+// clang-format off
+template bool run_ccd<false>(
+    thrust::device_vector<CCDData>&, const std::shared_ptr<MemoryHandler>,
+    const int, const int, const Scalar, const bool, const bool,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+    std::vector<int>&,
+#endif
+    Scalar&);
+template bool run_ccd<true>(
+    thrust::device_vector<CCDData>&, const std::shared_ptr<MemoryHandler>,
+    const int, const int, const Scalar, const bool, const bool,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+    std::vector<int>&,
+#endif
+    Scalar&);
+// clang-format on
 
 } // namespace scalable_ccd::cuda

@@ -12,18 +12,6 @@ struct CCDConfig {
     /// @brief The upper bound of the time interval.
     // Scalar max_t;
 
-    /// @brief
-    unsigned int mp_start; // TODO: remove this
-
-    /// @brief
-    unsigned int mp_end; // TODO: remove this
-
-    /// @brief
-    int mp_remaining; // TODO: remove this
-
-    /// @brief
-    long unit_size; // TODO: remove this
-
     /// @brief Time of impact.
     Scalar toi;
 
@@ -35,9 +23,6 @@ struct CCDConfig {
 
     /// @brief The maximum number of iterations.
     int max_iter;
-
-    /// @brief Error overflow flag.
-    int overflow_flag; // TODO: remove this
 };
 
 } // namespace scalable_ccd::cuda
