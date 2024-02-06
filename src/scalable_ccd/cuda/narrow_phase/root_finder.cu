@@ -303,7 +303,9 @@ ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi)
     if (tx >= buffer->starting_size())
         return;
 
-    const CCDDomain domain_in = buffer->pop();
+    // Get the tx element from the buffer without advancing the head.
+    // This allows for better coalescing of memory access compared to pop().
+    const CCDDomain domain_in = (*buffer)[tx];
     const int box_id = domain_in.query_id;
     const CCDData data_in = data[box_id];
     atomicAdd(&data[box_id].nbr_checks, 1);
@@ -456,7 +458,9 @@ bool run_ccd(
             d_buffer, thrust::raw_pointer_cast(d_data.data()), &d_toi);
         gpuErrchk(cudaDeviceSynchronize());
 
-        update_buffer_size<<<1, 1>>>(d_buffer);
+        // Update the starting index to reflect that the starting_size was
+        // procesed.
+        shift_queue_start<<<1, 1>>>(d_buffer);
         gpuErrchk(cudaDeviceSynchronize());
 
         gpuErrchk(cudaMemcpy(

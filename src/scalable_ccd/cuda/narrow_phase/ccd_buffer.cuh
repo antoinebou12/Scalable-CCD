@@ -14,13 +14,13 @@ struct CCDBuffer {
     /// @brief Check if the buffer is empty
     __device__ bool is_empty() const { return m_tail == m_head; }
 
-    __device__ CCDDomain pop()
-    {
-        if (!is_empty()) {
-            return m_data[atomicInc(&m_head, m_capacity - 1)];
-        }
-        assert(false);
-    }
+    // __device__ CCDDomain pop()
+    // {
+    //     if (!is_empty()) {
+    //         return m_data[atomicInc(&m_head, m_capacity - 1)];
+    //     }
+    //     assert(false);
+    // }
 
     __device__ CCDDomain& push(const CCDDomain& val)
     {
@@ -38,8 +38,12 @@ struct CCDBuffer {
         return m_data[(i + m_head) % m_capacity];
     }
 
-    __device__ void update_starting_size()
+    __device__ void shift_queue_start()
     {
+        // Update the head to the new starting position (assuming all starting
+        // elements were consumed)
+        m_head = (m_head + m_starting_size) % m_capacity;
+        // Calculate the new starting size
         if (m_head <= m_tail) {
             m_starting_size = m_tail - m_head;
         } else {
@@ -72,10 +76,10 @@ __global__ void initialize_buffer(CCDBuffer* buffer)
     buffer->m_data[tx].init(tx);
 }
 
-__global__ void update_buffer_size(CCDBuffer* buffer)
+__global__ void shift_queue_start(CCDBuffer* buffer)
 {
     assert(threadIdx.x == 0 && blockDim.x == 1 && gridDim.x == 1);
-    buffer->update_starting_size();
+    buffer->shift_queue_start();
 }
 
 } // namespace scalable_ccd::cuda
