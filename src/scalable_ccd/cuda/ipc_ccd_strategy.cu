@@ -8,33 +8,25 @@
 
 namespace scalable_ccd::cuda {
 
-double ipc_ccd_strategy(
-    const Eigen::MatrixXd& _V0,
-    const Eigen::MatrixXd& _V1,
+Scalar ipc_ccd_strategy(
+    const Eigen::MatrixXd& V0,
+    const Eigen::MatrixXd& V1,
     const Eigen::MatrixXi& E,
     const Eigen::MatrixXi& F,
     const int max_iter,
     const double min_distance,
     const double tolerance)
 {
-    assert(_V0.rows() == _V1.rows() && _V0.cols() == _V1.cols());
+    assert(V0.rows() == V1.rows() && V0.cols() == V1.cols());
 
     constexpr int npthreads = 1024;
 
     // --- Copy vertices to device --------------------------------------------
     logger().trace("Copying vertices");
 
-#ifdef SCALABLE_CCD_USE_DOUBLE
-    const Eigen::MatrixXd& V0 = _V0;
-    const Eigen::MatrixXd& V1 = _V1;
-#else
-    const Eigen::MatrixXf V0 = _V0.cast<float>();
-    const Eigen::MatrixXf V1 = _V1.cast<float>();
-#endif
-
     const DeviceMatrix<Scalar> d_vertices_t0(V0), d_vertices_t1(V1);
 
-    // --- Construct boxe -----------------------------------------------------
+    // --- Construct boxes ----------------------------------------------------
     logger().trace("Constructing boxes");
 
     std::vector<AABB> boxes;
@@ -59,23 +51,21 @@ double ipc_ccd_strategy(
             broad_phase.detect_overlaps_partial();
 
         logger().debug("Running narrow phase");
-        std::vector<int> _result_list; // unused
         const Scalar earliest_toi_before = earliest_toi;
-        run_narrow_phase(
+        narrow_phase(
             d_vertices_t0, d_vertices_t1, broad_phase.boxes(), d_overlaps,
             npthreads, /*max_iter=*/max_iter, /*tol=*/tolerance,
             /*ms=*/min_distance, /*allow_zero_toi=*/true, memory_handler,
-            _result_list, earliest_toi);
+            earliest_toi);
 
         if (earliest_toi < 1e-6) {
             logger().debug(
                 "Running narrow phase again (earliest_toi={:g})", earliest_toi);
             earliest_toi = earliest_toi_before;
-            run_narrow_phase(
+            narrow_phase(
                 d_vertices_t0, d_vertices_t1, broad_phase.boxes(), d_overlaps,
                 npthreads, /*max_iter=*/-1, /*tol=*/tolerance, /*ms=*/0.0,
-                /*allow_zero_toi=*/false, memory_handler, _result_list,
-                earliest_toi);
+                /*allow_zero_toi=*/false, memory_handler, earliest_toi);
             earliest_toi *= 0.8;
         }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <scalable_ccd/config.hpp>
+
 #include <scalable_ccd/cuda/memory_handler.hpp>
 
 #include <thrust/device_vector.h>
@@ -37,7 +39,7 @@ ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi);
 /// @param toi The time of impact.
 /// @return True if the algorithm overflows the maximum memory, false otherwise.
 template <bool is_vf>
-bool run_ccd(
+bool ccd(
     thrust::device_vector<CCDData>& d_data,
     const std::shared_ptr<MemoryHandler> memory_handler,
     const int parallel_nbr,

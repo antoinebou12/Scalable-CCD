@@ -392,7 +392,7 @@ ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi)
 }
 
 template <bool is_vf>
-bool run_ccd(
+bool ccd(
     thrust::device_vector<CCDData>& d_data,
     const std::shared_ptr<MemoryHandler> memory_handler,
     const int parallel_nbr,
@@ -544,14 +544,14 @@ template __global__ void
 ccd_kernel<true>(CCDBuffer* const, CCDData* const, Scalar* const);
 
 // clang-format off
-template bool run_ccd<false>(
+template bool ccd<false>(
     thrust::device_vector<CCDData>&, const std::shared_ptr<MemoryHandler>,
     const int, const int, const Scalar, const bool, const bool,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
     std::vector<int>&,
 #endif
     Scalar&);
-template bool run_ccd<true>(
+template bool ccd<true>(
     thrust::device_vector<CCDData>&, const std::shared_ptr<MemoryHandler>,
     const int, const int, const Scalar, const bool, const bool,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY

@@ -57,7 +57,7 @@ void merge_local(
     }
 }
 
-void run_sweep_multigpu(int N, int devcount)
+void sweep_multigpu(int N, int devcount)
 {
     vector<int> squareSums;
 
@@ -226,5 +226,5 @@ int main(int argc, char** argv)
         }
     }
 
-    run_sweep_multigpu(N, devcount);
+    sweep_multigpu(N, devcount);
 }

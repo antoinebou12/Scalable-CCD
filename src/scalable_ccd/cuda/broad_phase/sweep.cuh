@@ -45,7 +45,7 @@ __global__ void splitBoxes(
 /// @param start_box_id Starting box index
 /// @param overlaps Final output array of colliding box pairs
 /// @param memory_handler Memory handler
-__global__ void runSTQ(
+__global__ void sweep_and_tiniest_queue(
     const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
     const int num_boxes,
@@ -60,9 +60,8 @@ __global__ void runSTQ(
 /// @param start_box_id Starting box index
 /// @param overlaps Final output array of colliding box pairs
 /// @param memory_handler Memory handler
-/// @return
-__global__ void runSAP(
-    const Scalar2* const sortedMajorAxis,
+__global__ void
+sweep_and_prune(const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
     const int num_boxes,
     const int start_box_id,

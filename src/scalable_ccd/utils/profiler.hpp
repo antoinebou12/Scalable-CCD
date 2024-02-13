@@ -55,9 +55,10 @@ public:
         current_scope.pop_back();
     }
 
-    void print() { logger().info("{}", m_data.dump(2)); }
+    void print() const { logger().info("{}", m_data.dump(2)); }
 
-    const nlohmann::json& data() { return m_data; }
+    const nlohmann::json& data() const { return m_data; }
+    nlohmann::json& data() { return m_data; }
 
 protected:
     nlohmann::json m_data;

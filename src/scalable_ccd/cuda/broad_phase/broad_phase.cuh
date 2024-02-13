@@ -73,6 +73,8 @@ public:
     /// @brief Get the resulting overlaps stored on the GPU.
     const thrust::device_vector<int2>& overlaps() { return d_overlaps; }
 
+    int threads_per_block = 32;
+
 private:
     Dimension calc_sort_dimension() const;
 
@@ -80,17 +82,19 @@ private:
 
     std::shared_ptr<MemoryHandler> memory_handler;
 
+    /// @brief Boxes stored on the GPU
     thrust::device_vector<AABB> d_boxes;
+    /// @brief Sorted major axis intervals of d_boxes
     thrust::device_vector<Scalar2> d_sm;
+    /// @brief Sorted min and max values of the non-major axes and vertex information to check for simplex matching and covertices
     thrust::device_vector<MiniBox> d_mini;
 
+    /// @brief Populated with the indices of overlapping boxes upon detect_overlaps_partial()
     thrust::device_vector<int2> d_overlaps;
 
     const int device_init_id = 0;
-    const int memory_limit_GB = 0;
 
     int num_boxes_per_thread = 0;
-    int threads_per_block = 32;
     int thread_start_box_id = 0;
     int num_devices = 1;
 

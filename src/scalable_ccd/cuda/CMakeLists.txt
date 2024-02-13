@@ -1,4 +1,6 @@
 set(SOURCES
+  ccd.cu
+  ccd.cuh
   ipc_ccd_strategy.cu
   ipc_ccd_strategy.hpp
   memory_handler.cpp

@@ -49,11 +49,6 @@ BroadPhase::build(const std::vector<AABB>& boxes)
             memory_handler->MAX_OVERLAP_CUTOFF);
     }
 
-    if (memory_limit_GB) {
-        logger().trace("Setting memory limit to {:d} GB", memory_limit_GB);
-        memory_handler->limitGB = memory_limit_GB;
-    }
-
     setup(device_init_id, smemSize, threads_per_block, num_boxes_per_thread);
     cudaSetDevice(device_init_id);
 
@@ -112,15 +107,15 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
         d_memory_handler = *memory_handler; // Update memory handler on device
 
         {
-            SCALABLE_CCD_GPU_PROFILE_POINT("runSTQ");
+            SCALABLE_CCD_GPU_PROFILE_POINT("STQ");
 
 #ifdef SCALABLE_CCD_USE_CUDA_SAP
-            runSAP<<<grid_dim_1d(), threads_per_block>>>(
+            sweep_and_prune<<<grid_dim_1d(), threads_per_block>>>(
                 thrust::raw_pointer_cast(d_sm.data()),
                 thrust::raw_pointer_cast(d_mini.data()), num_boxes(),
                 thread_start_box_id, d_overlaps_buffer, &d_memory_handler);
 #else
-            runSTQ<<<grid_dim_1d(), threads_per_block>>>(
+            sweep_and_tiniest_queue<<<grid_dim_1d(), threads_per_block>>>(
                 thrust::raw_pointer_cast(d_sm.data()),
                 thrust::raw_pointer_cast(d_mini.data()), num_boxes(),
                 thread_start_box_id, d_overlaps_buffer, &d_memory_handler);

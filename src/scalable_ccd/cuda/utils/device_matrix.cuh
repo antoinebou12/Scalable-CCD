@@ -34,6 +34,15 @@ public:
         thrust::copy(mat.data(), mat.data() + mat.size(), m_data.begin());
     }
 
+#ifndef SCALABLE_CCD_USE_DOUBLE
+    DeviceMatrix(const Eigen::MatrixXd& mat) : DeviceMatrix(mat.cast<T>()) { }
+
+    void operator=(const Eigen::MatrixXd& mat)
+    {
+        return operator=(mat.cast<T>());
+    }
+#endif
+
     // TODO: Add function to retrieve the matrix from the device.
 
     const T* data() const { return thrust::raw_pointer_cast(m_data.data()); }

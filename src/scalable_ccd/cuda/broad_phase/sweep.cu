@@ -79,7 +79,7 @@ __global__ void splitBoxes(
 
 // -----------------------------------------------------------------------------
 
-__global__ void runSAP(
+__global__ void sweep_and_prune(
     const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
     const int num_boxes,
@@ -126,7 +126,7 @@ __global__ void runSAP(
     }
 }
 
-__global__ void runSTQ(
+__global__ void sweep_and_tiniest_queue(
     const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
     const int num_boxes,

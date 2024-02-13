@@ -2,16 +2,9 @@
 
 #include <scalable_ccd/config.hpp>
 
-#include <fstream>
-#include <iostream>
-
 #include <scalable_ccd/cuda/narrow_phase/root_finder.cuh>
-#include <scalable_ccd/cuda/broad_phase/aabb.cuh>
-#include <scalable_ccd/cuda/utils/assert.cuh>
-#include <scalable_ccd/cuda/utils/device_variable.cuh>
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
 #include <scalable_ccd/utils/profiler.hpp>
-#include <scalable_ccd/utils/logger.hpp>
 
 namespace scalable_ccd::cuda {
 
@@ -115,7 +108,7 @@ namespace {
 
 } // namespace
 
-void run_narrow_phase(
+void narrow_phase(
     const DeviceMatrix<Scalar>& d_vertices_t0,
     const DeviceMatrix<Scalar>& d_vertices_t1,
     const thrust::device_vector<AABB>& d_boxes,
@@ -126,7 +119,9 @@ void run_narrow_phase(
     const Scalar ms,
     const bool allow_zero_toi,
     std::shared_ptr<MemoryHandler> memory_handler,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
     std::vector<int>& result_list,
+#endif
     Scalar& toi)
 {
     assert(toi >= 0);
@@ -212,9 +207,9 @@ void run_narrow_phase(
             logger().trace(
                 "Running memory-pooled CCD using {:d} threads", parallel);
             {
-                SCALABLE_CCD_GPU_PROFILE_POINT("run_ccd (narrowphase)");
+                SCALABLE_CCD_GPU_PROFILE_POINT("ccd (narrowphase)");
 
-                overflowed = run_ccd</*is_vf=*/true>(
+                overflowed = ccd</*is_vf=*/true>(
                     d_vf_data_list, memory_handler, parallel, max_iter, tol,
                     use_ms, allow_zero_toi,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
@@ -235,9 +230,9 @@ void run_narrow_phase(
             logger().debug("ToI after FV: {:e}", toi);
 
             {
-                SCALABLE_CCD_GPU_PROFILE_POINT("run_ccd (narrowphase)");
+                SCALABLE_CCD_GPU_PROFILE_POINT("ccd (narrowphase)");
 
-                overflowed = run_ccd</*is_vf=*/false>(
+                overflowed = ccd</*is_vf=*/false>(
                     d_ee_data_list, memory_handler, parallel, max_iter, tol,
                     use_ms, allow_zero_toi,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
@@ -259,109 +254,5 @@ void run_narrow_phase(
         start_id += n_queries_to_process;
     }
 }
-
-#if false
-void run_ccd(
-    const std::vector<AABB>& boxes,
-    std::shared_ptr<MemoryHandler> memory_handler,
-    const Eigen::MatrixXd& _vertices_t0,
-    const Eigen::MatrixXd& _vertices_t1,
-    int N,
-    int& nbox,
-    int& parallel,
-    int& devcount,
-    int& limitGB,
-    std::vector<std::pair<int, int>>& overlaps,
-    std::vector<int>& result_list,
-    const bool allow_zero_toi,
-    Scalar& min_distance,
-    Scalar& toi)
-{
-    assert(_vertices_t0.rows() == _vertices_t1.rows());
-    assert(_vertices_t0.cols() == _vertices_t1.cols());
-
-    constexpr int bpthreads = 32; // TODO: hardcoding threads for now
-    constexpr int npthreads = 1024;
-
-    // Const variables
-#ifdef SCALABLE_CCD_USE_DOUBLE
-    const Eigen::MatrixXd& vertices_t0 = _vertices_t0;
-    const Eigen::MatrixXd& vertices_t1 = _vertices_t1;
-#else
-    const Eigen::MatrixXf vertices_t0 = _vertices_t0.cast<float>();
-    const Eigen::MatrixXf vertices_t1 = _vertices_t1.cast<float>();
-#endif
-    logger().trace("Copying vertices");
-    thrust::device_vector<Scalar> d_vertices_t0, d_vertices_t1;
-    thrust::copy(
-        vertices_t0.data(), vertices_t0.data() + vertices_t0.size(),
-        d_vertices_t0.begin());
-    thrust::copy(
-        vertices_t1.data(), vertices_t1.data() + vertices_t1.size(),
-        d_vertices_t1.begin());
-
-    toi = 1;
-
-    int tidstart = 0;
-
-    size_t total_count = 0;
-    while (N > tidstart && toi > 0) {
-        logger().trace(
-            "Next loop: N {:d}, tidstart {:d}", boxes.size(), tidstart);
-
-        r.Start("runBroadPhase", /*gpu=*/true);
-        thrust::device_vector<int2> d_overlaps;
-        runBroadPhase(
-            boxes, memory_handler, nbox, overlaps, d_overlaps, bpthreads,
-            tidstart, devcount, limitGB);
-        r.Stop();
-
-        logger().trace("First run end {:d}", tidstart);
-        // memory_handler->increaseOverlapCutoff(2);
-        logger().trace("Next cutoff {:d}", memory_handler->MAX_OVERLAP_CUTOFF);
-
-        logger().trace("Threads now {:d}", npthreads);
-
-        r.Start("copyBoxesToGpu", /*gpu=*/true);
-
-        total_count += d_overlaps.size();
-        logger().trace("Count {:d}", d_overlaps.size());
-
-        AABB* d_boxes = copy_to_gpu(boxes.data(), boxes.size());
-        r.Stop();
-
-        r.Start("copyVerticesToGpu", /*gpu=*/true);
-        logger().trace("Copying vertices");
-        double* d_vertices_t0 =
-            copy_to_gpu(vertices_t0.data(), vertices_t0.size());
-        double* d_vertices_t1 =
-            copy_to_gpu(vertices_t1.data(), vertices_t1.size());
-        r.Stop();
-        int n_vertices = vertices_t0.rows();
-        assert(n_vertices == vertices_t1.rows());
-
-        int max_iter = -1;
-        Scalar tolerance = 1e-6;
-
-        run_narrowphase(
-            d_overlaps, d_boxes, memory_handler, count, d_vertices_t0,
-            d_vertices_t1, n_vertices, npthreads, max_iter, tolerance, ms,
-            allow_zero_toi, result_list, toi, r);
-        gpuErrchk(cudaGetLastError());
-
-        gpuErrchk(cudaFree(d_count));
-        gpuErrchk(cudaFree(d_overlaps));
-        gpuErrchk(cudaFree(d_boxes));
-        gpuErrchk(cudaFree(d_vertices_t0));
-        gpuErrchk(cudaFree(d_vertices_t1));
-
-        gpuErrchk(cudaGetLastError());
-
-        cudaDeviceSynchronize();
-    }
-    logger().info("Total count {:d}", tot_count);
-    logger().info("LimitGB {:d}", memory_handler->limitGB);
-}
-#endif
 
 } // namespace scalable_ccd::cuda

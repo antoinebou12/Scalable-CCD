@@ -17,7 +17,7 @@ size_t MemoryHandler::__getAllocatable()
     const size_t used = total - free;
 
     const size_t default_allocatable = static_cast<size_t>(0.95 * free);
-    const size_t limit = limitGB << 30; // convert to bytes
+    const size_t limit = memory_limit_GB << 30; // convert to bytes
 
     const size_t user_allocatable =
         limit > used ? (limit - used) : default_allocatable;

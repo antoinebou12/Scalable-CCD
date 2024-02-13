@@ -19,7 +19,7 @@ struct MemoryHandler {
     /// @brief The real number of overlaps found in the last kernel launch.
     int real_count = 0;
     /// @brief
-    int limitGB = 0;
+    int memory_limit_GB = 0;
 
     size_t __getAllocatable();
 
