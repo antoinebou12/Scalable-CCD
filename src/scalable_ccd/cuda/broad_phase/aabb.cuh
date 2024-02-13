@@ -92,17 +92,6 @@ public:
 };
 
 struct MiniBox {
-    MiniBox() = default;
-
-    __device__
-    MiniBox(Scalar* tempmin, Scalar* tempmax, int3 vids, int assignid)
-    {
-        min = make_Scalar2(tempmin[0], tempmin[1]);
-        max = make_Scalar2(tempmax[0], tempmax[1]);
-        vertex_ids = vids;
-        box_id = assignid;
-    }
-
     Scalar2 min; // only y,z coord
     Scalar2 max;
     int3 vertex_ids;

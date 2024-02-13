@@ -2,8 +2,6 @@
 
 #include <scalable_ccd/cuda/scalar.cuh>
 
-#include <cuda/std/array>
-
 namespace scalable_ccd::cuda {
 
 struct Interval {
@@ -22,14 +20,20 @@ struct Interval {
         return *this;
     }
 
-    __device__ ::cuda::std::array<Interval, 2> split() const
-    {
-        const Scalar mid = (lower + upper) / 2;
-        return { { Interval(lower, mid), Interval(mid, upper) } };
-    }
-
     Scalar lower;
     Scalar upper;
+};
+
+struct SplitInterval {
+    __device__ SplitInterval(const Interval& interval)
+    {
+        const Scalar mid = (interval.lower + interval.upper) / 2;
+        first = Interval(interval.lower, mid);
+        second = Interval(mid, interval.upper);
+    }
+
+    Interval first;
+    Interval second;
 };
 
 class CCDDomain {
@@ -46,12 +50,14 @@ public:
     {
         if (this == &x)
             return *this;
-        this->tuv = x.tuv;
+        this->tuv[0] = x.tuv[0];
+        this->tuv[1] = x.tuv[1];
+        this->tuv[2] = x.tuv[2];
         this->query_id = x.query_id;
         return *this;
     }
 
-    ::cuda::std::array<Interval, 3> tuv;
+    Interval tuv[3];
     int query_id;
 };
 

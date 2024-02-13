@@ -62,7 +62,7 @@ BroadPhase::build(const std::vector<AABB>& boxes)
     // Initialize d_sm and d_mini
     {
         SCALABLE_CCD_GPU_PROFILE_POINT("splitBoxes");
-        splitBoxes<<<grid_dim_1d(), threads_per_block>>>(
+        split_boxes<<<grid_dim_1d(), threads_per_block>>>(
             thrust::raw_pointer_cast(d_boxes.data()),
             thrust::raw_pointer_cast(d_sm.data()),
             thrust::raw_pointer_cast(d_mini.data()), d_boxes.size(), axis);

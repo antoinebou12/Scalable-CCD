@@ -237,37 +237,36 @@ namespace {
 #endif
         CCDBuffer* const buffer)
     {
-        const ::cuda::std::array<Interval, 2> halves =
-            domain.tuv[split].split();
+        const SplitInterval halves(domain.tuv[split]);
 
-        if (halves[0].lower >= halves[0].upper
-            || halves[1].lower >= halves[1].upper) {
+        if (halves.first.lower >= halves.first.upper
+            || halves.second.lower >= halves.second.upper) {
             return true;
         }
 
-        buffer->push(domain).tuv[split] = halves[0];
+        buffer->push(domain).tuv[split] = halves.first;
 
         if (split == 0) {
-            if (halves[1].lower <= *toi) {
-                buffer->push(domain).tuv[0] = halves[1];
+            if (halves.second.lower <= *toi) {
+                buffer->push(domain).tuv[0] = halves.second;
             }
         } else {
             if constexpr (is_vf) {
                 if (split == 1) {
                     // check if u+v<=1
                     if (sum_less_than_one(
-                            halves[1].lower, domain.tuv[2].lower)) {
-                        buffer->push(domain).tuv[1] = halves[1];
+                            halves.second.lower, domain.tuv[2].lower)) {
+                        buffer->push(domain).tuv[1] = halves.second;
                     }
                 } else if (split == 2) {
                     // check if u+v<=1
                     if (sum_less_than_one(
-                            halves[1].lower, domain.tuv[1].lower)) {
-                        buffer->push(domain).tuv[2] = halves[1];
+                            halves.second.lower, domain.tuv[1].lower)) {
+                        buffer->push(domain).tuv[2] = halves.second;
                     }
                 }
             } else {
-                buffer->push(domain).tuv[split] = halves[1];
+                buffer->push(domain).tuv[split] = halves.second;
             }
         }
 

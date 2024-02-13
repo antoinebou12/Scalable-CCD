@@ -31,7 +31,7 @@ __global__ void calc_variance(
 /// @param mini Contains the vertex information of the boxes
 /// @param num_boxes Number of boxes
 /// @param axis Major axis
-__global__ void splitBoxes(
+__global__ void split_boxes(
     const AABB* const boxes,
     Scalar2* sortedmin,
     MiniBox* mini,
@@ -60,8 +60,8 @@ __global__ void sweep_and_tiniest_queue(
 /// @param start_box_id Starting box index
 /// @param overlaps Final output array of colliding box pairs
 /// @param memory_handler Memory handler
-__global__ void
-sweep_and_prune(const Scalar2* const sortedMajorAxis,
+__global__ void sweep_and_prune(
+    const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
     const int num_boxes,
     const int start_box_id,

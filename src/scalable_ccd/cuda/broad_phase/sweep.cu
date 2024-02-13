@@ -45,7 +45,7 @@ __global__ void calc_variance(
 
 // -----------------------------------------------------------------------------
 
-__global__ void splitBoxes(
+__global__ void split_boxes(
     const AABB* const boxes,
     Scalar2* sortedmin,
     MiniBox* mini,
@@ -57,31 +57,33 @@ __global__ void splitBoxes(
     if (tid >= num_boxes)
         return;
 
-    Scalar* min;
-    Scalar* max;
-
-    if (axis == x) {
+    switch (axis) {
+    case x:
         sortedmin[tid] = make_Scalar2(boxes[tid].min.x, boxes[tid].max.x);
-        min = (Scalar[2]) { boxes[tid].min.y, boxes[tid].min.z };
-        max = (Scalar[2]) { boxes[tid].max.y, boxes[tid].max.z };
-    } else if (axis == y) {
+        mini[tid].min = make_Scalar2(boxes[tid].min.y, boxes[tid].min.z);
+        mini[tid].max = make_Scalar2(boxes[tid].max.y, boxes[tid].max.z);
+        break;
+    case y:
         sortedmin[tid] = make_Scalar2(boxes[tid].min.y, boxes[tid].max.y);
-        min = (Scalar[2]) { boxes[tid].min.x, boxes[tid].min.z };
-        max = (Scalar[2]) { boxes[tid].max.x, boxes[tid].max.z };
-    } else {
+        mini[tid].min = make_Scalar2(boxes[tid].min.x, boxes[tid].min.z);
+        mini[tid].max = make_Scalar2(boxes[tid].max.x, boxes[tid].max.z);
+        break;
+    case z:
         sortedmin[tid] = make_Scalar2(boxes[tid].min.z, boxes[tid].max.z);
-        min = (Scalar[2]) { boxes[tid].min.x, boxes[tid].min.y };
-        max = (Scalar[2]) { boxes[tid].max.x, boxes[tid].max.y };
+        mini[tid].min = make_Scalar2(boxes[tid].min.x, boxes[tid].min.y);
+        mini[tid].max = make_Scalar2(boxes[tid].max.x, boxes[tid].max.y);
+        break;
     }
 
-    mini[tid] = MiniBox(min, max, boxes[tid].vertex_ids, tid);
+    mini[tid].vertex_ids = boxes[tid].vertex_ids;
+    mini[tid].box_id = tid;
 }
 
 // -----------------------------------------------------------------------------
 
 __global__ void sweep_and_prune(
-    const Scalar2* const sortedMajorAxis,
-    const MiniBox* const boxVerts,
+    const Scalar2* const sorted_major_axis,
+    const MiniBox* const mini_boxes,
     const int num_boxes,
     const int start_box_id,
     RawDeviceBuffer<int2> overlaps,
@@ -98,14 +100,14 @@ __global__ void sweep_and_prune(
     if (box_id >= num_boxes || next_box_id >= num_boxes)
         return;
 
-    const Scalar2& a = sortedMajorAxis[box_id];
+    const Scalar2& a = sorted_major_axis[box_id];
 
     Scalar b_x;
     b_x = __shfl_down_sync(0xffffffff, a.x, delta); // ???
-    b_x = sortedMajorAxis[next_box_id].x;
+    b_x = sorted_major_axis[next_box_id].x;
 
-    const MiniBox a_mini = boxVerts[box_id];
-    MiniBox b_mini = boxVerts[next_box_id];
+    const MiniBox a_mini = mini_boxes[box_id];
+    MiniBox b_mini = mini_boxes[next_box_id];
 
     while (a.y >= b_x && next_box_id < num_boxes) {
         if (does_collide(a_mini, b_mini)
@@ -120,15 +122,15 @@ __global__ void sweep_and_prune(
         delta++;
         if (next_box_id < num_boxes) {
             b_x = __shfl_down_sync(0xffffffff, a.x, delta);
-            b_x = sortedMajorAxis[next_box_id].x;
-            b_mini = boxVerts[next_box_id];
+            b_x = sorted_major_axis[next_box_id].x;
+            b_mini = mini_boxes[next_box_id];
         }
     }
 }
 
 __global__ void sweep_and_tiniest_queue(
-    const Scalar2* const sortedMajorAxis,
-    const MiniBox* const boxVerts,
+    const Scalar2* const sorted_major_axis,
+    const MiniBox* const mini_boxes,
     const int num_boxes,
     const int start_box_id,
     RawDeviceBuffer<int2> overlaps,
@@ -148,8 +150,8 @@ __global__ void sweep_and_tiniest_queue(
     if (box_id >= memory_handler->MAX_OVERLAP_CUTOFF + start_box_id)
         return;
 
-    Scalar a_max = sortedMajorAxis[box_id].y;
-    Scalar b_min = sortedMajorAxis[box_id + 1].x;
+    Scalar a_max = sorted_major_axis[box_id].y;
+    Scalar b_min = sorted_major_axis[box_id + 1].x;
 
     // If box_id and box_id+1 boxes collide on major axis, then push them onto
     // the queue.
@@ -166,8 +168,8 @@ __global__ void sweep_and_tiniest_queue(
         if (threadIdx.x >= queue.nbr_per_loop)
             return;
         int2 res = queue.pop();
-        MiniBox ax = boxVerts[res.x];
-        MiniBox bx = boxVerts[res.y];
+        MiniBox ax = mini_boxes[res.x];
+        MiniBox bx = mini_boxes[res.y];
 
         // Check for collision, matching simplex pair (edge-edge, vertex-face)
         // and not sharing same vertex.
@@ -182,8 +184,8 @@ __global__ void sweep_and_tiniest_queue(
         if (res.y + 1 >= num_boxes)
             return;
 
-        a_max = sortedMajorAxis[res.x].y;
-        b_min = sortedMajorAxis[res.y + 1].x;
+        a_max = sorted_major_axis[res.x].y;
+        b_min = sorted_major_axis[res.y + 1].x;
         if (a_max >= b_min) {
             res.y += 1;
             queue.push(res);
