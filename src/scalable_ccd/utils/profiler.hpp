@@ -5,8 +5,10 @@
 #ifdef SCALABLE_CCD_WITH_PROFILER
 
 #include <scalable_ccd/utils/timer.hpp>
-#include <scalable_ccd/cuda/utils/timer.cuh>
 #include <scalable_ccd/utils/logger.hpp>
+#ifdef SCALABLE_CCD_WITH_CUDA
+#include <scalable_ccd/cuda/utils/timer.cuh>
+#endif
 
 #include <nlohmann/json.hpp>
 
@@ -90,7 +92,9 @@ protected:
 };
 
 using CPUProfilePoint = ProfilePoint<scalable_ccd::Timer, false>;
+#ifdef SCALABLE_CCD_WITH_CUDA
 using GPUProfilePoint = ProfilePoint<scalable_ccd::cuda::Timer, true>;
+#endif
 
 } // namespace scalable_ccd
 
