@@ -1,3 +1,6 @@
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+
 #include "io.hpp"
 #include "ground_truth.hpp"
 
@@ -10,118 +13,59 @@
 
 #include <igl/write_triangle_mesh.h>
 
-#include <fstream>
-#include <unistd.h>
 #include <filesystem>
+namespace fs = std::filesystem;
 
-bool file_exists(const char* fileName)
-{
-    std::ifstream infile(fileName);
-    return infile.good();
-}
-
-int main(int argc, char** argv)
+TEST_CASE("Test CUDA broad phase", "[gpu][cuda][broad_phase]")
 {
     using namespace scalable_ccd;
     using namespace scalable_ccd::cuda;
 
-    logger().set_level(spdlog::level::trace);
-    std::vector<char*> compare;
+    const fs::path data(SCALABLE_CCD_TEST_DATA_DIR);
 
-    MemoryHandler* memhandle = new MemoryHandler();
+    const std::string file_t0 = data / "cloth_ball92.ply";
+    const std::string file_t1 = data / "cloth_ball93.ply";
 
-    char* filet0;
-    char* filet1;
+    const fs::path vf_ground_truth = data / "92vf.json";
+    const fs::path ee_ground_truth = data / "92ee.json";
 
-    filet0 = argv[1];
-    if (file_exists(argv[2]))
-        filet1 = argv[2];
-    else
-        filet1 = argv[1];
+    // ------------------------------------------------------------------------
+    // Load meshes
 
-    std::vector<scalable_ccd::cuda::AABB> boxes;
-    Eigen::MatrixXd vertices_t0;
-    Eigen::MatrixXd vertices_t1;
-    Eigen::MatrixXd pca_vertices_t0;
-    Eigen::MatrixXd pca_vertices_t1;
-    Eigen::MatrixXi faces;
-    Eigen::MatrixXi edges;
+    Eigen::MatrixXd vertices_t0, vertices_t1;
+    Eigen::MatrixXi edges, faces;
+    parse_mesh(file_t0, file_t1, vertices_t0, vertices_t1, faces, edges);
 
-    int nbox = 0;
-    int parallel = 0;
-    // bool evenworkload = false;
-    int devcount = 1;
-    // bool pairing = false;
-    // bool sharedqueue_mgpu = false;
-    // bool bigworkerqueue = false;
-    bool pca = false;
+    const bool pca = GENERATE(false, true);
+    if (pca) {
+        nipals_pca(vertices_t0, vertices_t1);
+    }
 
-    int memlimit = 0;
+    // ------------------------------------------------------------------------
+    // Run
 
-    int o;
-    while ((o = getopt(argc, argv, "c:n:b:p:d:v:WPQZ")) != -1) {
-        switch (o) {
-        case 'c':
-            optind--;
-            for (; optind < argc && *argv[optind] != '-'; optind++) {
-                compare.push_back(argv[optind]);
-            }
-            break;
-        // case 'n':
-        //   N = atoi(optarg);
-        //   break;
-        case 'b':
-            nbox = atoi(optarg);
-            break;
-        case 'v':
-            memlimit = atoi(optarg);
-            break;
-        case 'p':
-            parallel = std::stoi(optarg);
-            break;
-        case 'd':
-            devcount = atoi(optarg);
-            break;
-        case 'P':
-            pca = true;
-            break;
+    BroadPhase broad_phase;
+
+    std::vector<scalable_ccd::cuda::AABB> boxes; // output
+    broad_phase.build(vertices_t0, vertices_t1, edges, faces, boxes);
+
+    CHECK(boxes.size() == (vertices_t0.rows() + edges.rows() + faces.rows()));
+    CHECK(broad_phase.boxes().size() == boxes.size());
+
+    std::vector<std::pair<int, int>> overlaps = broad_phase.detect_overlaps();
+
+    logger().trace("Final CPU overlaps size: {:d}", overlaps.size());
+    const size_t expected_overlap_size = pca ? 6'954'911 : 6'852'873;
+    CHECK(overlaps.size() == expected_overlap_size);
+
+    // The ground truth is stored as VF, so swap the values if a is F and b is
+    // V. This also sorts the EE pairs to be consistent with the ground truth.
+    for (auto& [a, b] : overlaps) {
+        if (a > b) {
+            std::swap(a, b);
         }
     }
 
-    parse_mesh(filet0, filet1, vertices_t0, vertices_t1, faces, edges);
-    logger().trace(
-        "vertices_t0 : {:d} x {:d}", vertices_t0.rows(), vertices_t0.cols());
-    if (pca) {
-        scalable_ccd::nipals_pca(vertices_t0, vertices_t1);
-
-        std::string filet0Str(filet0);
-        std::filesystem::path p(filet0Str);
-        std::filesystem::path filename = p.filename();
-        std::string ext = filet0Str.substr(filet0Str.rfind('.') + 1);
-        std::filesystem::path current_path = std::filesystem::current_path();
-        std::string outname = current_path.parent_path().string() + "/"
-            + filename.stem().string() + "_pca." + ext;
-        igl::write_triangle_mesh(outname, vertices_t0, faces);
-    }
-    constructBoxes(vertices_t0, vertices_t1, edges, faces, boxes);
-    size_t N = boxes.size();
-
-    std::vector<std::pair<int, int>> overlaps;
-    int2* d_overlaps; // device
-    int* d_count;     // device
-    int tidstart = 0;
-
-    if (devcount == 1)
-        runBroadPhase(
-            boxes.data(), memhandle, N, nbox, overlaps, d_overlaps, d_count,
-            parallel, tidstart, devcount, memlimit);
-    else
-        runBroadPhaseMultiGPU(
-            boxes.data(), N, nbox, overlaps, parallel, devcount);
-
-    logger().debug("Final CPU overlaps size: {:d}", overlaps.size());
-
-    for (auto compFile : compare) {
-        compare_mathematica(overlaps, compFile);
-    }
+    compare_mathematica(overlaps, vf_ground_truth);
+    compare_mathematica(overlaps, ee_ground_truth);
 }

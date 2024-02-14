@@ -66,10 +66,10 @@ project(ScalableCCD
   VERSION "0.1.0")
 
 option(SCALABLE_CCD_WITH_CUDA "Enable CUDA CCD" OFF)
-OPTION(SCALABLE_CCD_USE_DOUBLE "Use double precision calculation" ON)
-OPTION(SCALABLE_CCD_TOI_PER_QUERY "Output time of impact per query in JSON" OFF)
+option(SCALABLE_CCD_USE_DOUBLE "Use double precision calculation" ON)
+option(SCALABLE_CCD_TOI_PER_QUERY "Output time of impact per query in JSON" OFF)
 option(SCALABLE_CCD_BUILD_TESTS "Build Scalable CCD tests" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
-OPTION(SCALABLE_CCD_WITH_PROFILER "Enable profiler" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
+option(SCALABLE_CCD_WITH_PROFILER "Enable profiler" ${SCALABLE_CCD_TOPLEVEL_PROJECT})
 
 # Set default minimum C++ standard
 if(SCALABLE_CCD_TOPLEVEL_PROJECT)

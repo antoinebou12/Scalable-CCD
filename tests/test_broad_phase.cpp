@@ -17,8 +17,11 @@ TEST_CASE("Test CPU broad phase", "[cpu][broad_phase]")
 
     const fs::path data(SCALABLE_CCD_TEST_DATA_DIR);
 
-    const std::string file_t0 = data / "cloth_ball92.ply";
-    const std::string file_t1 = data / "cloth_ball93.ply";
+    const fs::path file_t0 = data / "cloth_ball92.ply";
+    const fs::path file_t1 = data / "cloth_ball93.ply";
+
+    const fs::path vf_ground_truth = data / "92vf.json";
+    const fs::path ee_ground_truth = data / "92ee.json";
 
     // ------------------------------------------------------------------------
     // Load meshes
@@ -66,6 +69,6 @@ TEST_CASE("Test CPU broad phase", "[cpu][broad_phase]")
         f += offset;
     }
 
-    compare_mathematica(vf_overlaps, data / "92vf.json");
-    compare_mathematica(ee_overlaps, data / "92ee.json");
+    compare_mathematica(vf_overlaps, vf_ground_truth);
+    compare_mathematica(ee_overlaps, ee_ground_truth);
 }

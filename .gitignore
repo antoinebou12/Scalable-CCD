@@ -233,3 +233,4 @@ external
 paper/
 src/scalable_ccd/config.hpp
 tests/data/
+ScalableCCDOptions.cmake
