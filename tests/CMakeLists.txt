@@ -40,7 +40,7 @@ target_link_libraries(scalable_ccd_tests PRIVATE nlohmann_json::nlohmann_json)
 
 # TBB
 include(onetbb)
-target_link_libraries(scalable_ccd PRIVATE TBB::tbb)
+target_link_libraries(scalable_ccd_tests PRIVATE TBB::tbb)
 
 # Extra warnings (link last for highest priority)
 include(scalable_ccd_warnings)
