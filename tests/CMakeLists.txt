@@ -42,6 +42,10 @@ target_link_libraries(scalable_ccd_tests PRIVATE nlohmann_json::nlohmann_json)
 include(onetbb)
 target_link_libraries(scalable_ccd_tests PRIVATE TBB::tbb)
 
+# Sample data
+include(sample_data)
+target_link_libraries(scalable_ccd_tests PRIVATE scalable_ccd::data)
+
 # Extra warnings (link last for highest priority)
 include(scalable_ccd_warnings)
 target_link_libraries(scalable_ccd_tests PRIVATE scalable_ccd::warnings)
@@ -49,10 +53,6 @@ target_link_libraries(scalable_ccd_tests PRIVATE scalable_ccd::warnings)
 # ==============================================================================
 # Compiler options
 # ==============================================================================
-
-### Data directory
-cmake_path(APPEND SCALABLE_CCD_TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}" "data")
-target_compile_definitions(scalable_ccd_tests PRIVATE SCALABLE_CCD_TEST_DATA_DIR="${SCALABLE_CCD_TEST_DATA_DIR}")
 
 target_compile_definitions(scalable_ccd_tests PRIVATE CATCH_CONFIG_ENABLE_BENCHMARKING)
 

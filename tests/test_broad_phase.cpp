@@ -15,13 +15,17 @@ TEST_CASE("Test CPU broad phase", "[cpu][broad_phase]")
 {
     using namespace scalable_ccd;
 
-    const fs::path data(SCALABLE_CCD_TEST_DATA_DIR);
+    const fs::path data(SCALABLE_CCD_DATA_DIR);
 
-    const fs::path file_t0 = data / "cloth_ball92.ply";
-    const fs::path file_t1 = data / "cloth_ball93.ply";
+    const fs::path file_t0 =
+        data / "cloth-ball" / "frames" / "cloth_ball92.ply";
+    const fs::path file_t1 =
+        data / "cloth-ball" / "frames" / "cloth_ball93.ply";
 
-    const fs::path vf_ground_truth = data / "92vf.json";
-    const fs::path ee_ground_truth = data / "92ee.json";
+    const fs::path vf_ground_truth =
+        data / "cloth-ball" / "boxes" / "92vf.json";
+    const fs::path ee_ground_truth =
+        data / "cloth-ball" / "boxes" / "92ee.json";
 
     // ------------------------------------------------------------------------
     // Load meshes
