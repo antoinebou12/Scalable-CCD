@@ -1,5 +1,7 @@
 #include "io.hpp"
 
+#include <catch2/catch_test_macros.hpp>
+
 #include <igl/edges.h>
 #include <igl/read_triangle_mesh.h>
 
@@ -13,8 +15,9 @@ void parse_mesh(
     Eigen::MatrixXi& F,
     Eigen::MatrixXi& E)
 {
-    igl::read_triangle_mesh(file_t0, V0, F);
-    igl::read_triangle_mesh(file_t1, V1, F);
+    CAPTURE(file_t0, file_t1);
+    REQUIRE(igl::read_triangle_mesh(file_t0, V0, F));
+    REQUIRE(igl::read_triangle_mesh(file_t1, V1, F));
     igl::edges(F, E);
 }
 
@@ -31,7 +34,7 @@ void parse_mesh(
     parse_mesh(file_t0, file_t1, V0, V1, F, E);
     build_vertex_boxes(V0, V1, vertex_boxes);
     build_edge_boxes(vertex_boxes, E, edge_boxes);
-    build_edge_boxes(vertex_boxes, F, face_boxes);
+    build_face_boxes(vertex_boxes, F, face_boxes);
 }
 
 } // namespace scalable_ccd

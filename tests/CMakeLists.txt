@@ -3,25 +3,40 @@
 # ==============================================================================
 
 add_executable(scalable_ccd_tests
-  test_cuda_stq.cpp
+  main.cpp
+  test_broad_phase.cpp
+
+  # Utils
+  ground_truth.cpp
+  ground_truth.hpp
+  io.cpp
+  io.hpp
 )
 
 # if(SCALABLE_CCD_WITH_CUDA)
-# target_sources(scalable_ccd_tests PRIVATE
-# test_producer_consumer.cu
-# )
+#   target_sources(scalable_ccd_tests PRIVATE
+#     test_broad_phase.cu
+#     test_narrow_phase.cu
+#   )
 # endif()
 
 # ==============================================================================
 # Required Libraries
 # ==============================================================================
-target_link_libraries(scalable_ccd_tests PUBLIC scalable_ccd::scalable_ccd)
 
+target_link_libraries(scalable_ccd_tests PRIVATE scalable_ccd::scalable_ccd)
+
+# Catch2
 include(catch2)
-target_link_libraries(scalable_ccd_tests PUBLIC Catch2::Catch2WithMain)
+target_link_libraries(scalable_ccd_tests PRIVATE Catch2::Catch2)
 
+# libigl
 include(libigl)
-target_link_libraries(scalable_ccd_tests PUBLIC igl::core)
+target_link_libraries(scalable_ccd_tests PRIVATE igl::core)
+
+# JSON
+include(json)
+target_link_libraries(scalable_ccd_tests PRIVATE nlohmann_json::nlohmann_json)
 
 # Extra warnings (link last for highest priority)
 include(scalable_ccd_warnings)
@@ -30,11 +45,17 @@ target_link_libraries(scalable_ccd_tests PRIVATE scalable_ccd::warnings)
 # ==============================================================================
 # Compiler options
 # ==============================================================================
-target_compile_definitions(scalable_ccd_tests PUBLIC CATCH_CONFIG_ENABLE_BENCHMARKING)
+
+### Data directory
+cmake_path(APPEND SCALABLE_CCD_TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}" "data")
+target_compile_definitions(scalable_ccd_tests PRIVATE SCALABLE_CCD_TEST_DATA_DIR="${SCALABLE_CCD_TEST_DATA_DIR}")
+
+target_compile_definitions(scalable_ccd_tests PRIVATE CATCH_CONFIG_ENABLE_BENCHMARKING)
 
 # ==============================================================================
 # Register tests
 # ==============================================================================
+
 FetchContent_GetProperties(catch2)
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(Catch)

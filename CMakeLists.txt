@@ -129,11 +129,11 @@ target_link_libraries(scalable_ccd PUBLIC Eigen3::Eigen)
 
 # TBB
 include(onetbb)
-target_link_libraries(scalable_ccd PUBLIC TBB::tbb)
+target_link_libraries(scalable_ccd PRIVATE TBB::tbb)
 
 # Logger
 include(spdlog)
-target_link_libraries(scalable_ccd PRIVATE spdlog::spdlog)
+target_link_libraries(scalable_ccd PUBLIC spdlog::spdlog)
 
 # JSON
 if(SCALABLE_CCD_WITH_PROFILER)
@@ -144,7 +144,7 @@ endif()
 if(SCALABLE_CCD_TOI_PER_QUERY)
   # rational-cpp (requires GMP)
   include(rational_cpp)
-  target_link_libraries(ipc_toolkit PUBLIC rational::rational)
+  target_link_libraries(ipc_toolkit PRIVATE rational::rational)
 endif()
 
 # Extra warnings (link last for highest priority)
@@ -220,11 +220,4 @@ if(SCALABLE_CCD_TOPLEVEL_PROJECT AND SCALABLE_CCD_BUILD_TESTS)
   include(CTest)
   enable_testing()
   add_subdirectory(tests)
-endif()
-
-# ==============================================================================
-# Binary
-# ==============================================================================
-if(SCALABLE_CCD_TOPLEVEL_PROJECT)
-  add_subdirectory(apps)
 endif()

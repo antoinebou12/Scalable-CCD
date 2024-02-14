@@ -7,11 +7,12 @@
 namespace scalable_ccd {
 
 void compare_mathematica(
-    std::vector<std::pair<int, int>> overlaps, const std::string& mma_file);
+    std::vector<std::pair<int, int>> overlaps,
+    const std::string& ground_truth_file);
 
 void compare_mathematica(
     std::vector<std::pair<int, int>> overlaps,
     const std::vector<int>& result_list,
-    const std::string& mma_file);
+    const std::string& ground_truth_file);
 
 } // namespace scalable_ccd
