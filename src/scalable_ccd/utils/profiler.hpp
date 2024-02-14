@@ -2,7 +2,7 @@
 
 #include <scalable_ccd/config.hpp>
 
-#ifdef SCALABLE_CCD_WITH_PROFILING
+#ifdef SCALABLE_CCD_WITH_PROFILER
 
 #include <scalable_ccd/utils/timer.hpp>
 #include <scalable_ccd/cuda/utils/timer.cuh>

@@ -16,7 +16,7 @@ add_executable(scalable_ccd_tests
 if(SCALABLE_CCD_WITH_CUDA)
   target_sources(scalable_ccd_tests PRIVATE
     test_broad_phase.cu
-    # test_narrow_phase.cu
+    test_narrow_phase.cu
   )
 endif()
 

@@ -13,8 +13,8 @@ Scalar ipc_ccd_strategy(
     const Eigen::MatrixXd& V1,
     const Eigen::MatrixXi& E,
     const Eigen::MatrixXi& F,
-    const int max_iter,
     const double min_distance,
+    const int max_iter,
     const double tolerance)
 {
     assert(V0.rows() == V1.rows() && V0.cols() == V1.cols());

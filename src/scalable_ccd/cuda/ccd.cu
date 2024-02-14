@@ -12,10 +12,11 @@ namespace scalable_ccd::cuda {
 double
 ccd(const Eigen::MatrixXd& vertices_t0,
     const Eigen::MatrixXd& vertices_t1,
-    const std::vector<AABB>& boxes,
+    const Eigen::MatrixXi& edges,
+    const Eigen::MatrixXi& faces,
+    const Scalar minimum_separation_distance,
     const int max_iterations,
     const Scalar tolerance,
-    const Scalar minimum_separation_distance,
     const bool allow_zero_toi,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
     std::vector<int>& result_list
@@ -46,7 +47,9 @@ ccd(const Eigen::MatrixXd& vertices_t0,
 
     BroadPhase broad_phase(memory_handler);
     broad_phase.threads_per_block = bp_threads;
-    broad_phase.build(boxes);
+
+    std::vector<AABB> boxes;
+    broad_phase.build(vertices_t0, vertices_t1, edges, faces, boxes);
 
     // --- Run broad + narrow phase -------------------------------------------
 

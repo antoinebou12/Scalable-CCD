@@ -2,7 +2,7 @@
 
 namespace scalable_ccd {
 
-#ifdef SCALABLE_CCD_WITH_PROFILING
+#ifdef SCALABLE_CCD_WITH_PROFILER
 
 Profiler& profiler()
 {
