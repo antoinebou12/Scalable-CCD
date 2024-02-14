@@ -12,7 +12,7 @@ class AABB {
 public:
     AABB() = default;
 
-    AABB(const Scalar3& _min, const Scalar3& _max);
+    AABB(const Scalar3& min, const Scalar3& max);
 
     AABB(const AABB& a, const AABB& b)
         : AABB(

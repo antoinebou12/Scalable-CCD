@@ -9,6 +9,8 @@ namespace scalable_ccd::cuda {
 
 #ifdef SCALABLE_CCD_USE_DOUBLE
 
+__device__ constexpr double SCALAR_MAX = scalable_ccd::SCALAR_MAX;
+
 using Scalar2 = double2;
 using Scalar3 = double3;
 

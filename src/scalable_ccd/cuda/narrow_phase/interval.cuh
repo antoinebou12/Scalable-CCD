@@ -37,26 +37,27 @@ public:
         query_id = i;
     }
 
+    /// @brief The intervals for the t, u, and v parameters
     Interval tuv[3];
+    /// @brief The query id
     int query_id;
 };
 
 // this is to calculate the vertices of the inclusion function
-struct BoxPrimatives {
-    bool b[3];
-
-    int dim;
-
-    Scalar t;
-    Scalar u;
-    Scalar v;
-
-    __device__ void calculate_tuv(const CCDDomain& domain)
+struct DomainCorner {
+    /// @brief Update the t, u, and v parameters based on the corner.
+    /// @param domain Domain intervals
+    /// @param corner The corner to use (the first bit is for the t parameter, second for the u parameter, and third for the v parameter)
+    __device__ void update_tuv(const CCDDomain& domain, const uint8_t corner)
     {
-        t = b[0] ? domain.tuv[0].upper : domain.tuv[0].lower;
-        u = b[1] ? domain.tuv[1].upper : domain.tuv[1].lower;
-        v = b[2] ? domain.tuv[2].upper : domain.tuv[2].lower;
+        t = (corner & 1) ? domain.tuv[0].upper : domain.tuv[0].lower;
+        u = (corner & 2) ? domain.tuv[1].upper : domain.tuv[1].lower;
+        v = (corner & 4) ? domain.tuv[2].upper : domain.tuv[2].lower;
     }
+
+    Scalar t; ///< @brief The t parameter at the corner
+    Scalar u; ///< @brief The u parameter at the corner
+    Scalar v; ///< @brief The v parameter at the corner
 };
 
 } // namespace scalable_ccd::cuda

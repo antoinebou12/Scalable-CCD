@@ -134,32 +134,24 @@ namespace {
         data_in.err = max.array() * max.array() * max.array() * filter;
     }
 
-    __device__ Scalar
-    calculate_vf(const CCDData& data_in, const BoxPrimatives& bp)
+    __device__ Vector3
+    calculate_vf(const CCDData& data_in, const DomainCorner& tuv)
     {
-        const Scalar v = (data_in.v0e[bp.dim] - data_in.v0s[bp.dim]) * bp.t
-            + data_in.v0s[bp.dim];
-        const Scalar t0 = (data_in.v1e[bp.dim] - data_in.v1s[bp.dim]) * bp.t
-            + data_in.v1s[bp.dim];
-        const Scalar t1 = (data_in.v2e[bp.dim] - data_in.v2s[bp.dim]) * bp.t
-            + data_in.v2s[bp.dim];
-        const Scalar t2 = (data_in.v3e[bp.dim] - data_in.v3s[bp.dim]) * bp.t
-            + data_in.v3s[bp.dim];
-        return v - (t1 - t0) * bp.u - (t2 - t0) * bp.v - t0;
+        const Vector3 v = (data_in.v0e - data_in.v0s) * tuv.t + data_in.v0s;
+        const Vector3 t0 = (data_in.v1e - data_in.v1s) * tuv.t + data_in.v1s;
+        const Vector3 t1 = (data_in.v2e - data_in.v2s) * tuv.t + data_in.v2s;
+        const Vector3 t2 = (data_in.v3e - data_in.v3s) * tuv.t + data_in.v3s;
+        return v - (t1 - t0) * tuv.u - (t2 - t0) * tuv.v - t0;
     }
 
-    __device__ Scalar
-    calculate_ee(const CCDData& data_in, const BoxPrimatives& bp)
+    __device__ Vector3
+    calculate_ee(const CCDData& data_in, const DomainCorner& tuv)
     {
-        const Scalar ea0 = (data_in.v0e[bp.dim] - data_in.v0s[bp.dim]) * bp.t
-            + data_in.v0s[bp.dim];
-        const Scalar ea1 = (data_in.v1e[bp.dim] - data_in.v1s[bp.dim]) * bp.t
-            + data_in.v1s[bp.dim];
-        const Scalar eb0 = (data_in.v2e[bp.dim] - data_in.v2s[bp.dim]) * bp.t
-            + data_in.v2s[bp.dim];
-        const Scalar eb1 = (data_in.v3e[bp.dim] - data_in.v3s[bp.dim]) * bp.t
-            + data_in.v3s[bp.dim];
-        return ((ea1 - ea0) * bp.u + ea0) - ((eb1 - eb0) * bp.v + eb0);
+        const Vector3 ea0 = (data_in.v0e - data_in.v0s) * tuv.t + data_in.v0s;
+        const Vector3 ea1 = (data_in.v1e - data_in.v1s) * tuv.t + data_in.v1s;
+        const Vector3 eb0 = (data_in.v2e - data_in.v2s) * tuv.t + data_in.v2s;
+        const Vector3 eb1 = (data_in.v3e - data_in.v3s) * tuv.t + data_in.v3s;
+        return ((ea1 - ea0) * tuv.u + ea0) - ((eb1 - eb0) * tuv.v + eb0);
     }
 
     template <bool is_vf>
@@ -169,48 +161,39 @@ namespace {
         Scalar& true_tol,
         bool& box_in)
     {
-        box_in = true;
-        true_tol = 0.0;
-        BoxPrimatives bp;
-        Scalar vmin = SCALAR_MAX;
-        Scalar vmax = -SCALAR_MAX;
-        for (bp.dim = 0; bp.dim < 3; bp.dim++) {
-            vmin = SCALAR_MAX;
-            vmax = -SCALAR_MAX;
-            for (int i = 0; i < 2; i++) {
-                for (int j = 0; j < 2; j++) {
-                    for (int k = 0; k < 2; k++) {
-                        bp.b[0] = i;
-                        bp.b[1] = j;
-                        bp.b[2] = k;
-                        bp.calculate_tuv(domain);
+        Array3 codomain_min = Array3::Constant(SCALAR_MAX);
+        Array3 codomain_max = Array3::Constant(-SCALAR_MAX);
 
-                        Scalar value;
-                        if constexpr (is_vf) {
-                            value = calculate_vf(data_in, bp);
-                        } else {
-                            value = calculate_ee(data_in, bp);
-                        }
+        DomainCorner domain_corner;
+        for (uint8_t corner = 0; corner < 8; corner++) {
+            domain_corner.update_tuv(domain, corner);
 
-                        vmin = min(vmin, value);
-                        vmax = max(vmax, value);
-                    }
-                }
+            Vector3 codomain_corner;
+            if constexpr (is_vf) {
+                codomain_corner = calculate_vf(data_in, domain_corner);
+            } else {
+                codomain_corner = calculate_ee(data_in, domain_corner);
             }
 
-            // get the min and max in one dimension
-            true_tol = max(true_tol, vmax - vmin);
-
-            if (vmin - data_in.ms > data_in.err[bp.dim]
-                || vmax + data_in.ms < -data_in.err[bp.dim]) {
-                return false;
-            }
-
-            if (vmin + data_in.ms < -data_in.err[bp.dim]
-                || vmax - data_in.ms > data_in.err[bp.dim]) {
-                box_in = false;
-            }
+            codomain_min = codomain_min.min(codomain_corner.array());
+            codomain_max = codomain_max.max(codomain_corner.array());
         }
+
+        // get the min and max in one dimension
+        true_tol = max(0.0, (codomain_max - codomain_min).maxCoeff());
+
+        box_in = true;
+
+        if ((codomain_min - data_in.ms > data_in.err).any()
+            || (codomain_max + data_in.ms < -data_in.err).any()) {
+            return false;
+        }
+
+        if ((codomain_min + data_in.ms < -data_in.err).any()
+            || (codomain_max - data_in.ms > data_in.err).any()) {
+            box_in = false;
+        }
+
         return true;
     }
 
@@ -302,9 +285,8 @@ ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi)
     // Get the tx element from the buffer without advancing the head.
     // This allows for better coalescing of memory access compared to pop().
     const CCDDomain domain_in = (*buffer)[tx];
-    const int box_id = domain_in.query_id;
-    const CCDData data_in = data[box_id];
-    atomicAdd(&data[box_id].nbr_checks, 1);
+    const CCDData data_in = data[domain_in.query_id];
+    atomicAdd(&data[domain_in.query_id].nbr_checks, 1);
 
     const Scalar min_t = domain_in.tuv[0].lower; // the time of this domain
 
@@ -340,7 +322,7 @@ ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi)
         if ((widths <= data_in.tol).all()) {
             atomicMin(toi, min_t);
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, min_t);
+            atomicMin(&data[domain_in.query_id].toi, min_t);
 #endif
             return;
         }
@@ -349,7 +331,7 @@ ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi)
         if (box_in && (CONFIG.allow_zero_toi || min_t > 0)) {
             atomicMin(toi, min_t);
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, min_t);
+            atomicMin(&data[domain_in.query_id].toi, min_t);
 #endif
             return;
         }
@@ -359,7 +341,7 @@ ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi)
             && (CONFIG.allow_zero_toi || min_t > 0)) {
             atomicMin(toi, min_t);
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, min_t);
+            atomicMin(&data[domain_in.query_id].toi, min_t);
 #endif
             return;
         }
@@ -380,7 +362,7 @@ ccd_kernel(CCDBuffer* const buffer, CCDData* const data, Scalar* const toi)
         if (sure_in) {
             atomicMin(toi, min_t);
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            atomicMin(&data[box_id].toi, min_t);
+            atomicMin(&data[domain_in.query_id].toi, min_t);
 #endif
             return;
         }

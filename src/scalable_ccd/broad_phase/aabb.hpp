@@ -67,6 +67,8 @@ public:
     /// @brief Vertex IDs attached to the AABB.
     std::array<long, 3> vertex_ids;
     /// @brief Element ID attached to the AABB.
+    /// We require this because the boxes will be sorted and we need to know
+    /// which element they belong to.
     long element_id;
 };
 
