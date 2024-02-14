@@ -13,8 +13,8 @@
 namespace scalable_ccd::cuda {
 
 /// @brief Run the CCD narrow phase on the GPU
-/// @param d_vertices_t0
-/// @param d_vertices_t1
+/// @param d_vertices_t0 The vertices at t=0 stored in a DeviceMatrix
+/// @param d_vertices_t1 The vertices at t=1 stored in a DeviceMatrix
 /// @param d_boxes The list of AABBs
 /// @param d_overlaps The list of pairs of indices of the boxes that overlap
 /// @param threads The number of threads to use for the GPU kernel
@@ -22,10 +22,9 @@ namespace scalable_ccd::cuda {
 /// @param tolerance The root-finding tolerance
 /// @param minimum_separation_distance The minimum separation distance
 /// @param allow_zero_toi If true, allow a time of impact of zero
-/// @param memory_handler
-/// @param result_list
-/// @param toi
-/// @return
+/// @param memory_handler The memory handler
+/// @param collisions The list of pairs of indices of the boxes that collide and the time of impact.
+/// @param toi Earlier time of impact found
 void narrow_phase(
     const DeviceMatrix<Scalar>& d_vertices_t0,
     const DeviceMatrix<Scalar>& d_vertices_t1,
@@ -38,7 +37,7 @@ void narrow_phase(
     const bool allow_zero_toi,
     std::shared_ptr<MemoryHandler> memory_handler,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-    std::vector<int>& result_list,
+    std::vector<std::tuple<int, int, Scalar>>& collisions,
 #endif
     Scalar& toi);
 

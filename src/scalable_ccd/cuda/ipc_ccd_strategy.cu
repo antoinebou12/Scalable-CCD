@@ -18,6 +18,7 @@ Scalar ipc_ccd_strategy(
     const double tolerance)
 {
     assert(V0.rows() == V1.rows() && V0.cols() == V1.cols());
+    assert(V0.cols() == 3);
 
     constexpr int npthreads = 1024;
 
@@ -52,10 +53,16 @@ Scalar ipc_ccd_strategy(
 
         logger().debug("Running narrow phase");
         const Scalar earliest_toi_before = earliest_toi;
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+        std::vector<std::tuple<int, int, Scalar>> _collisions;
+#endif
         narrow_phase(
             d_vertices_t0, d_vertices_t1, broad_phase.boxes(), d_overlaps,
             npthreads, /*max_iter=*/max_iter, /*tol=*/tolerance,
             /*ms=*/min_distance, /*allow_zero_toi=*/true, memory_handler,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+            _collisions,
+#endif
             earliest_toi);
 
         if (earliest_toi < 1e-6) {
@@ -65,7 +72,11 @@ Scalar ipc_ccd_strategy(
             narrow_phase(
                 d_vertices_t0, d_vertices_t1, broad_phase.boxes(), d_overlaps,
                 npthreads, /*max_iter=*/-1, /*tol=*/tolerance, /*ms=*/0.0,
-                /*allow_zero_toi=*/false, memory_handler, earliest_toi);
+                /*allow_zero_toi=*/false, memory_handler,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+                _collisions,
+#endif
+                earliest_toi);
             earliest_toi *= 0.8;
         }
 

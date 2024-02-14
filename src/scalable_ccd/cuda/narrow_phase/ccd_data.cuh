@@ -5,29 +5,7 @@
 
 namespace scalable_ccd::cuda {
 
-class CCDData {
-public:
-    __host__ __device__ CCDData() = default;
-
-    __device__ __host__ CCDData& operator=(const CCDData& x)
-    {
-        if (this == &x)
-            return *this;
-        v0s = x.v0s;
-        v1s = x.v1s;
-        v2s = x.v2s;
-        v3s = x.v3s;
-        v0e = x.v0e;
-        v1e = x.v1e;
-        v2e = x.v2e;
-        v3e = x.v3e;
-        err = x.err;
-        tol = x.tol;
-        ms = x.ms;
-        // nbr_checks = x.nbr_checks; ???
-        return *this;
-    }
-
+struct CCDData {
     Vector3 v0s;
     Vector3 v1s;
     Vector3 v2s;

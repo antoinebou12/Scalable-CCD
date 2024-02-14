@@ -47,9 +47,6 @@ bool ccd(
     const Scalar tol,
     const bool use_ms,
     const bool allow_zero_toi,
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-    std::vector<int>& result_list,
-#endif
     Scalar& toi);
 
 } // namespace scalable_ccd::cuda

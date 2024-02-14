@@ -6,6 +6,9 @@
 #include <scalable_ccd/cuda/utils/device_buffer.cuh>
 #include <scalable_ccd/utils/profiler.hpp>
 
+#include <thrust/host_vector.h>
+#include <thrust/copy.h>
+
 namespace scalable_ccd::cuda {
 
 namespace {
@@ -73,8 +76,7 @@ namespace {
         const int3 bvids = boxes[maxxer].vertex_ids;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-        data[tid].toi = std::numeric_limits<Scalar>::infinity();
-        // data[tid].box_id = shift + tid;
+        data[tid].toi = INFINITY;
         data[tid].aid = minner;
         data[tid].bid = maxxer;
 #endif
@@ -106,6 +108,36 @@ namespace {
         }
     }
 
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+    struct is_collision {
+        __host__ __device__ bool operator()(const CCDData& data)
+        {
+            return data.toi < 1;
+        }
+    };
+
+    void copy_out_collisions(
+        const thrust::device_vector<CCDData>& d_ccd_data,
+        std::vector<std::tuple<int, int, Scalar>>& collisions)
+    {
+        // Filter only the collisions on the device
+        thrust::device_vector<CCDData> d_filtered_ccd_data(d_ccd_data.size());
+        auto itr = thrust::copy_if(
+            d_ccd_data.begin(), d_ccd_data.end(), d_filtered_ccd_data.begin(),
+            is_collision());
+        d_filtered_ccd_data.resize(
+            thrust::distance(d_filtered_ccd_data.begin(), itr));
+
+        // Copy the filtered collisions to the host
+        thrust::host_vector<CCDData> filtered_ccd_data = d_filtered_ccd_data;
+
+        // Transform the filtered collisions to the output format
+        for (const auto& data : filtered_ccd_data) {
+            collisions.emplace_back(data.aid, data.bid, data.toi);
+        }
+    }
+#endif
+
 } // namespace
 
 void narrow_phase(
@@ -120,7 +152,7 @@ void narrow_phase(
     const bool allow_zero_toi,
     std::shared_ptr<MemoryHandler> memory_handler,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-    std::vector<int>& result_list,
+    std::vector<std::tuple<int, int, Scalar>>& collisions,
 #endif
     Scalar& toi)
 {
@@ -143,6 +175,7 @@ void narrow_phase(
         bool overflowed = false;
         size_t n_queries_to_process;
 
+        thrust::device_vector<CCDData> d_vf_data_list, d_ee_data_list;
         do {
             n_queries_to_process =
                 std::min(remaining_queries, memory_handler->MAX_QUERIES);
@@ -155,14 +188,13 @@ void narrow_phase(
             assert(n_queries_to_process > 0);
             assert(n_queries_to_process <= d_overlaps.size());
 
-            thrust::device_vector<CCDData> d_vf_data_list, d_ee_data_list;
             {
                 // Allocate enough space for the worst case
                 DeviceBuffer<int2> d_vf_overlaps(n_queries_to_process);
                 DeviceBuffer<int2> d_ee_overlaps(n_queries_to_process);
 
                 {
-                    SCALABLE_CCD_GPU_PROFILE_POINT("splitOverlaps");
+                    SCALABLE_CCD_GPU_PROFILE_POINT("split_overlaps");
 
                     split_overlaps<<<
                         n_queries_to_process / threads + 1, threads>>>(
@@ -178,7 +210,7 @@ void narrow_phase(
                     d_vf_overlaps.size(), d_ee_overlaps.size());
 
                 {
-                    SCALABLE_CCD_GPU_PROFILE_POINT("createDataList");
+                    SCALABLE_CCD_GPU_PROFILE_POINT("create_ccd_data");
 
                     d_vf_data_list.resize(d_vf_overlaps.size());
                     add_data<<<d_vf_data_list.size() / threads + 1, threads>>>(
@@ -207,15 +239,11 @@ void narrow_phase(
             logger().trace(
                 "Running memory-pooled CCD using {:d} threads", parallel);
             {
-                SCALABLE_CCD_GPU_PROFILE_POINT("ccd (narrowphase)");
+                SCALABLE_CCD_GPU_PROFILE_POINT("FV CCD");
 
                 overflowed = ccd</*is_vf=*/true>(
                     d_vf_data_list, memory_handler, parallel, max_iter, tol,
-                    use_ms, allow_zero_toi,
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-                    result_list,
-#endif
-                    toi);
+                    use_ms, allow_zero_toi, toi);
 
                 gpuErrchk(cudaDeviceSynchronize());
             }
@@ -230,15 +258,11 @@ void narrow_phase(
             logger().debug("ToI after FV: {:e}", toi);
 
             {
-                SCALABLE_CCD_GPU_PROFILE_POINT("ccd (narrowphase)");
+                SCALABLE_CCD_GPU_PROFILE_POINT("EE CCD");
 
                 overflowed = ccd</*is_vf=*/false>(
                     d_ee_data_list, memory_handler, parallel, max_iter, tol,
-                    use_ms, allow_zero_toi,
-#ifdef SCALABLE_CCD_TOI_PER_QUERY
-                    result_list,
-#endif
-                    toi);
+                    use_ms, allow_zero_toi, toi);
 
                 gpuErrchk(cudaDeviceSynchronize());
             }
@@ -246,10 +270,17 @@ void narrow_phase(
             if (overflowed) {
                 logger().debug(
                     "Narrow-phase: overflowed upon edge-edge; reducing parallel count");
+                continue;
             }
 
             logger().debug("ToI after EE: {:e}", toi);
         } while (overflowed);
+
+        {
+            SCALABLE_CCD_GPU_PROFILE_POINT("copy_out_collisions");
+            copy_out_collisions(d_vf_data_list, collisions);
+            copy_out_collisions(d_ee_data_list, collisions);
+        }
 
         start_id += n_queries_to_process;
     }

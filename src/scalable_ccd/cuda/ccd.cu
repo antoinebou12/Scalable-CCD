@@ -19,7 +19,7 @@ ccd(const Eigen::MatrixXd& vertices_t0,
     const Scalar tolerance,
     const bool allow_zero_toi,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-    std::vector<int>& result_list
+    std::vector<std::tuple<int, int, Scalar>>& collisions,
 #endif
     const int memory_limit_GB)
 {
@@ -75,7 +75,7 @@ ccd(const Eigen::MatrixXd& vertices_t0,
                 np_threads, max_iterations, tolerance,
                 minimum_separation_distance, allow_zero_toi, memory_handler,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-                result_list,
+                collisions,
 #endif
                 toi);
 

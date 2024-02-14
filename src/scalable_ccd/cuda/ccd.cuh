@@ -20,7 +20,7 @@ namespace scalable_ccd::cuda {
 /// @param max_iterations Maximum number of iterations in the narrow phase
 /// @param tolerance Tolerance for the time of impact
 /// @param allow_zero_toi If true, allow a time of impact of zero
-/// @param result_list List of collision pairs
+/// @param collisions List of collision pairs
 /// @param memory_limit_GB Maximum GPU memory usage in GB
 /// @return The earliest time of impact
 Scalar
@@ -33,7 +33,7 @@ ccd(const Eigen::MatrixXd& vertices_t0,
     const Scalar tolerance,
     const bool allow_zero_toi,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-    std::vector<int>& result_list
+    std::vector<std::tuple<int, int, Scalar>>& collisions,
 #endif
     const int memory_limit_GB = 0);
 

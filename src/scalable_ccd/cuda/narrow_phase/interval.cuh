@@ -11,15 +11,6 @@ struct Interval {
     {
     }
 
-    __device__ Interval& operator=(const Interval& x)
-    {
-        if (this == &x)
-            return *this;
-        lower = x.lower;
-        upper = x.upper;
-        return *this;
-    }
-
     Scalar lower;
     Scalar upper;
 };
@@ -44,17 +35,6 @@ public:
         tuv[1] = Interval(0, 1);
         tuv[2] = Interval(0, 1);
         query_id = i;
-    }
-
-    __device__ CCDDomain& operator=(const CCDDomain& x)
-    {
-        if (this == &x)
-            return *this;
-        this->tuv[0] = x.tuv[0];
-        this->tuv[1] = x.tuv[1];
-        this->tuv[2] = x.tuv[2];
-        this->query_id = x.query_id;
-        return *this;
     }
 
     Interval tuv[3];

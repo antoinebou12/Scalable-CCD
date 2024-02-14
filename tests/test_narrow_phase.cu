@@ -45,16 +45,22 @@ TEST_CASE("Test CUDA narrow phase", "[gpu][cuda][narrow_phase]")
     constexpr Scalar memory_limit_GB = 0;
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-    std::vector<int> result_list;
+    std::vector<std::tuple<int, int, Scalar>> collisions;
 #endif
 
     Scalar toi =
         ccd(vertices_t0, vertices_t1, edges, faces, min_distance,
             max_iterations, tolerance, allow_zero_toi,
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
-            result_list,
+            collisions,
 #endif
             memory_limit_GB);
+
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+    for (const auto& [i, j, _toi] : collisions) {
+        CHECK(toi <= _toi);
+    }
+#endif
 
     CHECK(toi == Catch::Approx(3.814697265625e-06));
 
