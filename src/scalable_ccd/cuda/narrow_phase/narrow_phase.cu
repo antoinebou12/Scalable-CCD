@@ -276,11 +276,13 @@ void narrow_phase(
             logger().debug("ToI after EE: {:e}", toi);
         } while (overflowed);
 
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
         {
             SCALABLE_CCD_GPU_PROFILE_POINT("copy_out_collisions");
             copy_out_collisions(d_vf_data_list, collisions);
             copy_out_collisions(d_ee_data_list, collisions);
         }
+#endif
 
         start_id += n_queries_to_process;
     }
