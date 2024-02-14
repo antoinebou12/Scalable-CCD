@@ -14,7 +14,7 @@ namespace scalable_ccd {
 
 void compare_mathematica(
     std::vector<std::pair<int, int>> overlaps,
-    const std::string& ground_truth_file)
+    const std::filesystem::path& ground_truth_file)
 {
     // Dummy result list
     std::vector<int> result_list;
@@ -27,14 +27,15 @@ void compare_mathematica(
 void compare_mathematica(
     std::vector<std::pair<int, int>> overlaps,
     const std::vector<int>& result_list,
-    const std::string& ground_truth_file)
+    const std::filesystem::path& ground_truth_file)
 {
     // Get from file
     std::set<std::pair<long, long>> true_positives;
     {
         std::ifstream in(ground_truth_file);
         REQUIRE(in.good());
-        logger().trace("Comparing mathematica file {:s}", ground_truth_file);
+        logger().trace(
+            "Comparing mathematica file {:s}", ground_truth_file.string());
 
         const json j = json::parse(in);
 

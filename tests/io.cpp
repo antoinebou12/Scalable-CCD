@@ -8,22 +8,22 @@
 namespace scalable_ccd {
 
 void parse_mesh(
-    const std::string& file_t0,
-    const std::string& file_t1,
+    const std::filesystem::path& file_t0,
+    const std::filesystem::path& file_t1,
     Eigen::MatrixXd& V0,
     Eigen::MatrixXd& V1,
     Eigen::MatrixXi& F,
     Eigen::MatrixXi& E)
 {
     CAPTURE(file_t0, file_t1);
-    REQUIRE(igl::read_triangle_mesh(file_t0, V0, F));
-    REQUIRE(igl::read_triangle_mesh(file_t1, V1, F));
+    REQUIRE(igl::read_triangle_mesh(file_t0.string(), V0, F));
+    REQUIRE(igl::read_triangle_mesh(file_t1.string(), V1, F));
     igl::edges(F, E);
 }
 
 void parse_mesh(
-    const std::string& file_t0,
-    const std::string& file_t1,
+    const std::filesystem::path& file_t0,
+    const std::filesystem::path& file_t1,
     std::vector<AABB>& vertex_boxes,
     std::vector<AABB>& edge_boxes,
     std::vector<AABB>& face_boxes)
