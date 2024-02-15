@@ -44,6 +44,8 @@ void build_vertex_boxes(
     const Eigen::MatrixXf vertices = _vertices.cast<float>();
 #endif
 
+    vertex_boxes.resize(vertices.rows());
+
     tbb::parallel_for(
         tbb::blocked_range<long>(0, vertices.rows()),
         [&](const tbb::blocked_range<long>& r) {
@@ -62,6 +64,9 @@ void build_vertex_boxes(
     std::vector<AABB>& vertex_boxes,
     const double inflation_radius)
 {
+    assert(_vertices_t0.rows() == _vertices_t1.rows());
+    assert(_vertices_t0.cols() == _vertices_t1.cols());
+
 #ifdef SCALABLE_CCD_USE_DOUBLE
     const Eigen::MatrixXd& vertices_t0 = _vertices_t0;
     const Eigen::MatrixXd& vertices_t1 = _vertices_t1;

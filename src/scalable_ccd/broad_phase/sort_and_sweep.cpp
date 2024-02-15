@@ -19,12 +19,22 @@ namespace {
     /// @param a Vertex ids of the first element.
     /// @param b Vertex ids of the second element.
     /// @return True if the elements share a vertex, false otherwise.
-    bool
+    inline bool
     share_a_vertex(const std::array<long, 3>& a, const std::array<long, 3>& b)
     {
         return a[0] == b[0] || a[0] == b[1] || a[0] == b[2] //
             || a[1] == b[0] || a[1] == b[1] || a[1] == b[2] //
             || a[2] == b[0] || a[2] == b[1] || a[2] == b[2];
+    }
+
+    template <bool is_two_lists>
+    inline bool is_valid_pair(const long id_a, const long id_b)
+    {
+        if constexpr (is_two_lists) {
+            return (id_a >= 0 && id_b < 0) || (id_a < 0 && id_b >= 0);
+        } else {
+            return true;
+        }
     }
 
     // https://stackoverflow.com/questions/3909272/sorting-two-corresponding-arrays
@@ -58,16 +68,6 @@ namespace {
             return a.min[axis] < b.min[axis];
         }
     };
-
-    template <bool is_two_lists>
-    inline bool is_valid_pair(const long id_a, const long id_b)
-    {
-        if constexpr (is_two_lists) {
-            return (id_a >= 0 && id_b < 0) || (id_a < 0 && id_b >= 0);
-        } else {
-            return true;
-        }
-    }
 
     /// @brief Sweep the boxes along the given axis (without memory check).
     /// @param[in] boxes Boxes to sweep.
@@ -225,28 +225,16 @@ void sort_and_sweep(
     sort_along_axis(sort_axis, boxesA);
     sort_along_axis(sort_axis, boxesB);
 
-    // Merge the two lists of boxes (giving the boxA IDs negative values).
-    std::vector<AABB> boxes(boxesA.size() + boxesB.size());
-    for (size_t i = 0, j = 0, k = 0; k < boxes.size(); k++) {
-        if (i < boxesA.size() && j < boxesB.size()) {
-            if (boxesA[i].min[sort_axis] < boxesB[j].min[sort_axis]) {
-                boxes[k] = boxesA[i];
-                boxes[k].element_id = flip_id(boxesA[i].element_id);
-                i++;
-            } else {
-                boxes[k] = boxesB[j];
-                j++;
-            }
-        } else if (i < boxesA.size()) {
-            boxes[k] = boxesA[i];
-            boxes[k].element_id = flip_id(boxesA[i].element_id);
-            i++;
-        } else {
-            assert(j < boxesB.size());
-            boxes[k] = boxesB[j];
-            j++;
-        }
+    // Flip the IDs of the first list
+    for (AABB& box : boxesA) {
+        box.element_id = flip_id(box.element_id);
     }
+
+    // Merge the two lists of boxes
+    std::vector<AABB> boxes(boxesA.size() + boxesB.size());
+    std::merge(
+        boxesA.begin(), boxesA.end(), boxesB.begin(), boxesB.end(),
+        boxes.begin(), SortBoxes(sort_axis));
 
     sweep</*is_two_lists=*/true>(boxes, sort_axis, overlaps);
 }
