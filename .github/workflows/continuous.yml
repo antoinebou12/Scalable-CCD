@@ -10,7 +10,7 @@ env:
   CTEST_PARALLEL_LEVEL: 2
 
 jobs:
-  Build and Run Tests:
+  build_and_tests:
     name: ${{ matrix.name }} (${{ matrix.config }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -106,7 +106,7 @@ jobs:
       - name: Tests
         run: cd build; ctest --verbose -j2
 
-  Build CUDA: # no runtime support for CUDA, so only build on Linux
+  build_cuda: # no runtime support for CUDA, so only build on Linux
     name: ${{ matrix.name }} (${{ matrix.config }} CUDA)
     runs-on: ${{ matrix.os }}
     strategy:
