@@ -113,7 +113,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        config: [Debug, Release]
+        config:
+          - Debug
+          # - Release # cannot run multiple cuda-toolkit jobs in parallel
         include:
           - os: ubuntu-latest
             name: Linux
@@ -139,7 +141,7 @@ jobs:
         uses: actions/cache@v3.0.11
         with:
           path: ${{ env.CACHE_PATH }}
-          key: ${{ runner.os }}-${{ matrix.config }}-cuda-cache
+          key: ${{ runner.os }}-${{ matrix.config }}-CUDA-cache
 
       - name: Prepare ccache
         run: |
