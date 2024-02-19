@@ -8,6 +8,7 @@
 #include <scalable_ccd/cuda/utils/device_variable.cuh>
 
 #include <thrust/execution_policy.h>
+#include <thrust/sort.h>
 
 #include <tbb/parallel_for.h>
 
