@@ -10,7 +10,7 @@ env:
   CTEST_PARALLEL_LEVEL: 2
 
 jobs:
-  Build:
+  Build and Run Tests:
     name: ${{ matrix.name }} (${{ matrix.config }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -105,3 +105,57 @@ jobs:
 
       - name: Tests
         run: cd build; ctest --verbose -j2
+
+  Build CUDA: # no runtime support for CUDA, so only build on Linux
+    name: ${{ matrix.name }} (${{ matrix.config }} CUDA)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        config: [Debug, Release]
+        include:
+          - os: ubuntu-latest
+            name: Linux
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 10
+
+      - name: Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install ccache
+          echo 'CACHE_PATH=~/.cache/ccache' >> "$GITHUB_ENV"
+
+      - uses: Jimver/cuda-toolkit@v0.2.14
+        id: cuda-toolkit
+
+      - name: Cache Build
+        id: cache-build
+        uses: actions/cache@v3.0.11
+        with:
+          path: ${{ env.CACHE_PATH }}
+          key: ${{ runner.os }}-${{ matrix.config }}-cuda-cache
+
+      - name: Prepare ccache
+        run: |
+          ccache --max-size=1.0G
+          ccache -V && ccache --show-config
+          ccache --show-stats && ccache --zero-stats
+
+      - name: Configure
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DSCALABLE_CCD_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+
+      - name: Build
+        run: cd build; make -j2; ccache --show-stats
+
+      # GitHub Actions does not support CUDA, so we cannot run the tests.
+      # - name: Tests
+      #   run: cd build; ctest --verbose -j2
