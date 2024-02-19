@@ -107,7 +107,7 @@ jobs:
         run: cd build; ctest --verbose -j2
 
   build_cuda: # no runtime support for CUDA, so only build on Linux
-    name: ${{ matrix.name }} (${{ matrix.config }} CUDA)
+    name: ${{ matrix.name }} CUDA (${{ matrix.config }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -131,6 +131,8 @@ jobs:
 
       - uses: Jimver/cuda-toolkit@v0.2.14
         id: cuda-toolkit
+        with:
+          cuda: '12.3.2'
 
       - name: Cache Build
         id: cache-build
