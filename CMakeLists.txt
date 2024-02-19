@@ -176,7 +176,10 @@ if(SCALABLE_CCD_WITH_CUDA)
   # other libraries and executables.
   set_target_properties(scalable_ccd PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
-  if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24.0")
+  if(DEFINED SCALABLE_CCD_CUDA_ARCHITECTURES)
+    message(STATUS "CUDA_ARCHITECTURES was specified, skipping auto-detection")
+    set(CMAKE_CUDA_ARCHITECTURES ${SCALABLE_CCD_CUDA_ARCHITECTURES})
+  elseif(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24.0")
     set(CMAKE_CUDA_ARCHITECTURES "native")
   else()
     include(FindCUDA/select_compute_arch)

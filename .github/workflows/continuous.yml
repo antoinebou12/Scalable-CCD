@@ -155,6 +155,7 @@ jobs:
           cd build
           cmake .. \
             -DSCALABLE_CCD_WITH_CUDA=ON \
+            -DSCALABLE_CCD_CUDA_ARCHITECTURES=75 \
             -DSCALABLE_CCD_BUILD_TESTS=ON \
             -DCMAKE_BUILD_TYPE=${{ matrix.config }}
 
