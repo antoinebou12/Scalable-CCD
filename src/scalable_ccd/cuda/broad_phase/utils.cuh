@@ -6,20 +6,10 @@ namespace scalable_ccd::cuda {
 
 enum Dimension { x, y, z };
 
-struct sort_aabb_x {
-    __device__ bool operator()(const AABB& a, const AABB& b) const
-    {
-        return (a.min.x < b.min.x);
-    }
-
-    __device__ bool operator()(const Scalar3& a, const Scalar3& b) const
-    {
-        return (a.x < b.x);
-    }
-
+struct SortIntervals {
     __device__ bool operator()(const Scalar2& a, const Scalar2& b) const
     {
-        return (a.x < b.x);
+        return a.x < b.x;
     }
 };
 

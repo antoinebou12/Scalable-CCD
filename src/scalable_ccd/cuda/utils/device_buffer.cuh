@@ -60,8 +60,8 @@ template <typename T> struct RawDeviceBuffer {
         data[i] = value;
     }
 
-    T* data;
-    int* size;
+    T* const data;
+    int* const size;
     const size_t capacity;
 };
 

@@ -4,12 +4,15 @@
 #include "io.hpp"
 #include "ground_truth.hpp"
 
+#include <scalable_ccd/config.hpp>
+
 #include <scalable_ccd/cuda/memory_handler.hpp>
 #include <scalable_ccd/cuda/broad_phase/broad_phase.cuh>
 #include <scalable_ccd/cuda/broad_phase/utils.cuh>
 #include <scalable_ccd/cuda/broad_phase/aabb.cuh>
 #include <scalable_ccd/utils/pca.hpp>
 #include <scalable_ccd/utils/logger.hpp>
+#include <scalable_ccd/utils/profiler.hpp>
 
 #include <igl/write_triangle_mesh.h>
 
@@ -48,28 +51,41 @@ TEST_CASE("Test CUDA broad phase", "[gpu][cuda][broad_phase]")
     // ------------------------------------------------------------------------
     // Run
 
+    std::vector<scalable_ccd::cuda::AABB> vertex_boxes, edge_boxes, face_boxes;
+    build_vertex_boxes(vertices_t0, vertices_t1, vertex_boxes);
+    build_edge_boxes(vertex_boxes, edges, edge_boxes);
+    build_face_boxes(vertex_boxes, faces, face_boxes);
+
     BroadPhase broad_phase;
 
-    std::vector<scalable_ccd::cuda::AABB> boxes; // output
-    broad_phase.build(vertices_t0, vertices_t1, edges, faces, boxes);
+    broad_phase.build(
+        std::make_shared<DeviceAABBs>(vertex_boxes),
+        std::make_shared<DeviceAABBs>(face_boxes));
+    std::vector<std::pair<int, int>> vf_overlaps =
+        broad_phase.detect_overlaps();
 
-    CHECK(boxes.size() == (vertices_t0.rows() + edges.rows() + faces.rows()));
-    CHECK(broad_phase.boxes().size() == boxes.size());
+    broad_phase.build(std::make_shared<DeviceAABBs>(edge_boxes));
+    std::vector<std::pair<int, int>> ee_overlaps =
+        broad_phase.detect_overlaps();
 
-    std::vector<std::pair<int, int>> overlaps = broad_phase.detect_overlaps();
-
-    logger().trace("Final CPU overlaps size: {:d}", overlaps.size());
     const size_t expected_overlap_size = pca ? 6'954'911 : 6'852'873;
-    CHECK(overlaps.size() == expected_overlap_size);
+    CHECK(vf_overlaps.size() + ee_overlaps.size() == expected_overlap_size);
 
-    // The ground truth is stored as VF, so swap the values if a is F and b is
-    // V. This also sorts the EE pairs to be consistent with the ground truth.
-    for (auto& [a, b] : overlaps) {
-        if (a > b) {
-            std::swap(a, b);
-        }
+    // Offset the boxes to match the way ground truth was originally generated.
+    int offset = vertex_boxes.size();
+    for (auto& [a, b] : ee_overlaps) {
+        a += offset;
+        b += offset;
+    }
+    offset += edge_boxes.size();
+    for (auto& [v, f] : vf_overlaps) {
+        f += offset;
     }
 
-    compare_mathematica(overlaps, vf_ground_truth);
-    compare_mathematica(overlaps, ee_ground_truth);
+    compare_mathematica(vf_overlaps, vf_ground_truth);
+    compare_mathematica(ee_overlaps, ee_ground_truth);
+
+#ifdef SCALABLE_CCD_WITH_PROFILER
+    profiler().print();
+#endif
 }

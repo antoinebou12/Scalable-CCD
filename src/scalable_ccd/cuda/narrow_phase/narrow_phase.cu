@@ -12,100 +12,65 @@
 namespace scalable_ccd::cuda {
 
 namespace {
-
-    /// @brief Split the heterogeneous array of overlaps into two array of vertex-face and edge-edge overlaps.
-    /// @param[in] boxes The array of AABBs
-    /// @param[in] overlaps The array of pairs of indices of the boxes that overlap
-    /// @param[in] n_overlaps The number of overlaps
-    /// @param[out] vf_overlaps The output array of pairs of indices of the vertex-face overlaps
-    /// @param[out] ee_overlaps The output array of pairs of indices of the edge-edge overlaps
-    __global__ void split_overlaps(
-        const AABB* const boxes,
+    /// @brief Populate the CCDData array with the necessary data for the narrow phase.
+    /// @param vertices_t0 Vertex positions at time t=0
+    /// @param vertices_t1 Vertex positions at time t=1
+    /// @param edge Edge matrix
+    /// @param faces Face matrix
+    /// @param overlaps The array of pairs of indices of the boxes that overlap
+    /// @param n_overlaps The number of overlaps
+    /// @param ms Minimum separation distance
+    /// @param data The output array of CCDData
+    template <bool is_vf>
+    __global__ void add_data(
+        const RawDeviceMatrix<Scalar> vertices_t0,
+        const RawDeviceMatrix<Scalar> vertices_t1,
+        const RawDeviceMatrix<int> edges,
+        const RawDeviceMatrix<int> faces,
         const int2* const overlaps,
         const int n_overlaps,
-        RawDeviceBuffer<int2> vf_overlaps,
-        RawDeviceBuffer<int2> ee_overlaps)
+        const Scalar ms,
+        CCDData* data)
     {
         const int tid = threadIdx.x + blockIdx.x * blockDim.x;
         if (tid >= n_overlaps)
             return;
 
-        const int a_id = min(overlaps[tid].x, overlaps[tid].y);
-        const int b_id = max(overlaps[tid].x, overlaps[tid].y);
-
-        if (boxes[a_id].is_vertex() && boxes[b_id].is_face()) {
-            vf_overlaps.push(make_int2(a_id, b_id));
-        } else if (boxes[a_id].is_edge() && boxes[b_id].is_edge()) {
-            ee_overlaps.push(make_int2(a_id, b_id));
-        } else {
-            printf(
-                "Invalid overlap: %d %d [(%d %d %d); (%d %d %d)]\n", a_id, b_id,
-                boxes[a_id].is_vertex(), boxes[a_id].is_edge(),
-                boxes[a_id].is_face(), boxes[b_id].is_vertex(),
-                boxes[b_id].is_edge(), boxes[b_id].is_face());
-            assert(false);
-        }
-    }
-
-    /// @brief Populate the CCDData array with the necessary data for the narrow phase.
-    /// @param V0 Vertex positions at time t=0
-    /// @param V1 Vertex positions at time t=1
-    /// @param n_vertices The number of vertices
-    /// @param boxes The array of AABBs
-    /// @param overlaps The array of pairs of indices of the boxes that overlap
-    /// @param ms Minimum separation distance
-    /// @param data The output array of CCDData
-    __global__ void add_data(
-        const Scalar* const V0,
-        const Scalar* const V1,
-        const int n_vertices,
-        const AABB* const boxes,
-        const RawDeviceBuffer<int2> overlaps,
-        const Scalar ms,
-        CCDData* data)
-    {
-        const int tid = threadIdx.x + blockIdx.x * blockDim.x;
-        if (tid >= *overlaps.size)
-            return;
-
         data[tid].ms = ms;
 
-        const int minner = min(overlaps[tid].x, overlaps[tid].y);
-        const int maxxer = max(overlaps[tid].x, overlaps[tid].y);
-        const int3 avids = boxes[minner].vertex_ids;
-        const int3 bvids = boxes[maxxer].vertex_ids;
+        if constexpr (is_vf) {
+            const auto& [vi, fi] = overlaps[tid];
+
+            for (int i = 0; i < 3; i++) {
+                data[tid].v0s[i] = vertices_t0(vi, i);
+                data[tid].v1s[i] = vertices_t0(faces(fi, 0), i);
+                data[tid].v2s[i] = vertices_t0(faces(fi, 1), i);
+                data[tid].v3s[i] = vertices_t0(faces(fi, 2), i);
+                data[tid].v0e[i] = vertices_t1(vi, i);
+                data[tid].v1e[i] = vertices_t1(faces(fi, 0), i);
+                data[tid].v2e[i] = vertices_t1(faces(fi, 1), i);
+                data[tid].v3e[i] = vertices_t1(faces(fi, 2), i);
+            }
+        } else {
+            const auto& [eai, ebi] = overlaps[tid];
+
+            for (int i = 0; i < 3; i++) {
+                data[tid].v0s[i] = vertices_t0(edges(eai, 0), i);
+                data[tid].v1s[i] = vertices_t0(edges(eai, 1), i);
+                data[tid].v2s[i] = vertices_t0(edges(ebi, 0), i);
+                data[tid].v3s[i] = vertices_t0(edges(ebi, 1), i);
+                data[tid].v0e[i] = vertices_t1(edges(eai, 0), i);
+                data[tid].v1e[i] = vertices_t1(edges(eai, 1), i);
+                data[tid].v2e[i] = vertices_t1(edges(ebi, 0), i);
+                data[tid].v3e[i] = vertices_t1(edges(ebi, 1), i);
+            }
+        }
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
         data[tid].toi = INFINITY;
-        data[tid].aid = minner;
-        data[tid].bid = maxxer;
+        data[tid].aid = overlaps[tid].x;
+        data[tid].bid = overlaps[tid].y;
 #endif
-
-        if (AABB::is_vertex(avids) && AABB::is_face(bvids)) {
-            for (size_t i = 0; i < 3; i++) {
-                data[tid].v0s[i] = V0[avids.x + i * n_vertices];
-                data[tid].v1s[i] = V0[bvids.x + i * n_vertices];
-                data[tid].v2s[i] = V0[bvids.y + i * n_vertices];
-                data[tid].v3s[i] = V0[bvids.z + i * n_vertices];
-                data[tid].v0e[i] = V1[avids.x + i * n_vertices];
-                data[tid].v1e[i] = V1[bvids.x + i * n_vertices];
-                data[tid].v2e[i] = V1[bvids.y + i * n_vertices];
-                data[tid].v3e[i] = V1[bvids.z + i * n_vertices];
-            }
-        } else if (AABB::is_edge(avids) && AABB::is_edge(bvids)) {
-            for (size_t i = 0; i < 3; i++) {
-                data[tid].v0s[i] = V0[avids.x + i * n_vertices];
-                data[tid].v1s[i] = V0[avids.y + i * n_vertices];
-                data[tid].v2s[i] = V0[bvids.x + i * n_vertices];
-                data[tid].v3s[i] = V0[bvids.y + i * n_vertices];
-                data[tid].v0e[i] = V1[avids.x + i * n_vertices];
-                data[tid].v1e[i] = V1[avids.y + i * n_vertices];
-                data[tid].v2e[i] = V1[bvids.x + i * n_vertices];
-                data[tid].v3e[i] = V1[bvids.y + i * n_vertices];
-            }
-        } else {
-            assert(false);
-        }
     }
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
@@ -140,10 +105,12 @@ namespace {
 
 } // namespace
 
+template <bool is_vf>
 void narrow_phase(
     const DeviceMatrix<Scalar>& d_vertices_t0,
     const DeviceMatrix<Scalar>& d_vertices_t1,
-    const thrust::device_vector<AABB>& d_boxes,
+    const DeviceMatrix<int>& d_edges,
+    const DeviceMatrix<int>& d_faces,
     const thrust::device_vector<int2>& d_overlaps,
     const int threads,
     const int max_iter,
@@ -175,7 +142,7 @@ void narrow_phase(
         bool overflowed = false;
         size_t n_queries_to_process;
 
-        thrust::device_vector<CCDData> d_vf_data_list, d_ee_data_list;
+        thrust::device_vector<CCDData> d_ccd_data;
         do {
             n_queries_to_process =
                 std::min(remaining_queries, memory_handler->MAX_QUERIES);
@@ -189,61 +156,30 @@ void narrow_phase(
             assert(n_queries_to_process <= d_overlaps.size());
 
             {
-                // Allocate enough space for the worst case
-                DeviceBuffer<int2> d_vf_overlaps(n_queries_to_process);
-                DeviceBuffer<int2> d_ee_overlaps(n_queries_to_process);
+                SCALABLE_CCD_GPU_PROFILE_POINT("create_ccd_data");
 
-                {
-                    SCALABLE_CCD_GPU_PROFILE_POINT("split_overlaps");
-
-                    split_overlaps<<<
-                        n_queries_to_process / threads + 1, threads>>>(
-                        thrust::raw_pointer_cast(d_boxes.data()),
-                        thrust::raw_pointer_cast(d_overlaps.data()) + start_id,
-                        n_queries_to_process, d_vf_overlaps, d_ee_overlaps);
-
-                    gpuErrchk(cudaDeviceSynchronize());
-                }
-
-                logger().trace(
-                    "# FV queries: {:d}; # EE queries: {:d}",
-                    d_vf_overlaps.size(), d_ee_overlaps.size());
-
-                {
-                    SCALABLE_CCD_GPU_PROFILE_POINT("create_ccd_data");
-
-                    d_vf_data_list.resize(d_vf_overlaps.size());
-                    add_data<<<d_vf_data_list.size() / threads + 1, threads>>>(
-                        d_vertices_t0.data(), d_vertices_t1.data(),
-                        d_vertices_t0.rows(),
-                        thrust::raw_pointer_cast(d_boxes.data()), d_vf_overlaps,
-                        ms, thrust::raw_pointer_cast(d_vf_data_list.data()));
-                    gpuErrchk(cudaDeviceSynchronize());
-
-                    d_ee_data_list.resize(d_ee_overlaps.size());
-                    add_data<<<d_ee_data_list.size() / threads + 1, threads>>>(
-                        d_vertices_t0.data(), d_vertices_t1.data(),
-                        d_vertices_t0.rows(),
-                        thrust::raw_pointer_cast(d_boxes.data()), d_ee_overlaps,
-                        ms, thrust::raw_pointer_cast(d_ee_data_list.data()));
-                    gpuErrchk(cudaDeviceSynchronize());
-                }
+                d_ccd_data.resize(d_overlaps.size());
+                add_data<is_vf><<<d_ccd_data.size() / threads + 1, threads>>>(
+                    d_vertices_t0, d_vertices_t1, d_edges, d_faces,
+                    thrust::raw_pointer_cast(d_overlaps.data()),
+                    d_overlaps.size(), ms,
+                    thrust::raw_pointer_cast(d_ccd_data.data()));
+                gpuErrchk(cudaDeviceSynchronize());
             }
 
             logger().trace(
                 "Narrow phase CCD data size: {:g} GB",
-                (d_vf_data_list.size() + d_ee_data_list.size())
-                    * sizeof(CCDData) / 1e9);
+                d_ccd_data.size() * sizeof(CCDData) / 1e9);
 
             constexpr int parallel = 64;
             logger().trace(
                 "Running memory-pooled CCD using {:d} threads", parallel);
             {
-                SCALABLE_CCD_GPU_PROFILE_POINT("FV CCD");
+                SCALABLE_CCD_GPU_PROFILE_POINT(is_vf ? "FV CCD" : "EE CCD");
 
-                overflowed = ccd</*is_vf=*/true>(
-                    d_vf_data_list, memory_handler, parallel, max_iter, tol,
-                    use_ms, allow_zero_toi, toi);
+                overflowed = ccd<is_vf>(
+                    d_ccd_data, memory_handler, parallel, max_iter, tol, use_ms,
+                    allow_zero_toi, toi);
 
                 gpuErrchk(cudaDeviceSynchronize());
             }
@@ -251,41 +187,57 @@ void narrow_phase(
             if (overflowed) // rerun
             {
                 logger().debug(
-                    "Narrow-phase: overflowed upon face-vertex; reducing parallel count");
+                    "Narrow-phase: overflowed; reducing parallel count");
                 continue;
             }
 
-            logger().debug("ToI after FV: {:e}", toi);
-
-            {
-                SCALABLE_CCD_GPU_PROFILE_POINT("EE CCD");
-
-                overflowed = ccd</*is_vf=*/false>(
-                    d_ee_data_list, memory_handler, parallel, max_iter, tol,
-                    use_ms, allow_zero_toi, toi);
-
-                gpuErrchk(cudaDeviceSynchronize());
-            }
-
-            if (overflowed) {
-                logger().debug(
-                    "Narrow-phase: overflowed upon edge-edge; reducing parallel count");
-                continue;
-            }
-
-            logger().debug("ToI after EE: {:e}", toi);
+            logger().debug("ToI after {}: {:e}", is_vf ? "FV" : "EE", toi);
         } while (overflowed);
 
 #ifdef SCALABLE_CCD_TOI_PER_QUERY
         {
             SCALABLE_CCD_GPU_PROFILE_POINT("copy_out_collisions");
-            copy_out_collisions(d_vf_data_list, collisions);
-            copy_out_collisions(d_ee_data_list, collisions);
+            copy_out_collisions(d_ccd_data, collisions);
         }
 #endif
 
         start_id += n_queries_to_process;
     }
 }
+
+// === Template instantiation =================================================
+
+template void narrow_phase<false>(
+    const DeviceMatrix<Scalar>&,
+    const DeviceMatrix<Scalar>&,
+    const DeviceMatrix<int>& d_edges,
+    const DeviceMatrix<int>& d_faces,
+    const thrust::device_vector<int2>&,
+    const int,
+    const int,
+    const Scalar,
+    const Scalar,
+    const bool,
+    std::shared_ptr<MemoryHandler>,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+    std::vector<std::tuple<int, int, Scalar>>&,
+#endif
+    Scalar&);
+template void narrow_phase<true>(
+    const DeviceMatrix<Scalar>&,
+    const DeviceMatrix<Scalar>&,
+    const DeviceMatrix<int>& d_edges,
+    const DeviceMatrix<int>& d_faces,
+    const thrust::device_vector<int2>&,
+    const int,
+    const int,
+    const Scalar,
+    const Scalar,
+    const bool,
+    std::shared_ptr<MemoryHandler>,
+#ifdef SCALABLE_CCD_TOI_PER_QUERY
+    std::vector<std::tuple<int, int, Scalar>>&,
+#endif
+    Scalar&);
 
 } // namespace scalable_ccd::cuda

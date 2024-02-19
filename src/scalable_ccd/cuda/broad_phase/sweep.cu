@@ -45,42 +45,7 @@ __global__ void calc_variance(
 
 // -----------------------------------------------------------------------------
 
-__global__ void split_boxes(
-    const AABB* const boxes,
-    Scalar2* sortedmin,
-    MiniBox* mini,
-    const int num_boxes,
-    const Dimension axis)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if (tid >= num_boxes)
-        return;
-
-    switch (axis) {
-    case x:
-        sortedmin[tid] = make_Scalar2(boxes[tid].min.x, boxes[tid].max.x);
-        mini[tid].min = make_Scalar2(boxes[tid].min.y, boxes[tid].min.z);
-        mini[tid].max = make_Scalar2(boxes[tid].max.y, boxes[tid].max.z);
-        break;
-    case y:
-        sortedmin[tid] = make_Scalar2(boxes[tid].min.y, boxes[tid].max.y);
-        mini[tid].min = make_Scalar2(boxes[tid].min.x, boxes[tid].min.z);
-        mini[tid].max = make_Scalar2(boxes[tid].max.x, boxes[tid].max.z);
-        break;
-    case z:
-        sortedmin[tid] = make_Scalar2(boxes[tid].min.z, boxes[tid].max.z);
-        mini[tid].min = make_Scalar2(boxes[tid].min.x, boxes[tid].min.y);
-        mini[tid].max = make_Scalar2(boxes[tid].max.x, boxes[tid].max.y);
-        break;
-    }
-
-    mini[tid].vertex_ids = boxes[tid].vertex_ids;
-    mini[tid].box_id = tid;
-}
-
-// -----------------------------------------------------------------------------
-
+template <bool is_two_lists>
 __global__ void sweep_and_prune(
     const Scalar2* const sorted_major_axis,
     const MiniBox* const mini_boxes,
@@ -110,12 +75,23 @@ __global__ void sweep_and_prune(
     MiniBox b_mini = mini_boxes[next_box_id];
 
     while (a.y >= b_x && next_box_id < num_boxes) {
-        if (does_collide(a_mini, b_mini)
-            && AABB::is_valid_pair(a_mini.vertex_ids, b_mini.vertex_ids)
-            && !covertex(a_mini.vertex_ids, b_mini.vertex_ids)) {
-            add_overlap(
-                a_mini.box_id, b_mini.box_id, overlaps,
-                memory_handler->real_count);
+        if (is_valid_pair<is_two_lists>(a_mini.element_id, b_mini.element_id)
+            && a_mini.intersects(b_mini)
+            && !share_a_vertex(a_mini.vertex_ids, b_mini.vertex_ids)) {
+
+            if constexpr (is_two_lists) {
+                // Negative IDs are from the first list
+                add_overlap(
+                    flip_id(min(a_mini.element_id, b_mini.element_id)),
+                    max(a_mini.element_id, b_mini.element_id), //
+                    overlaps, memory_handler->real_count);
+            } else {
+                assert(a_mini.element_id >= 0 && b_mini.element_id >= 0);
+                add_overlap(
+                    min(a_mini.element_id, b_mini.element_id),
+                    max(a_mini.element_id, b_mini.element_id), //
+                    overlaps, memory_handler->real_count);
+            }
         }
 
         next_box_id++;
@@ -128,6 +104,7 @@ __global__ void sweep_and_prune(
     }
 }
 
+template <bool is_two_lists>
 __global__ void sweep_and_tiniest_queue(
     const Scalar2* const sorted_major_axis,
     const MiniBox* const mini_boxes,
@@ -168,16 +145,28 @@ __global__ void sweep_and_tiniest_queue(
         if (threadIdx.x >= queue.nbr_per_loop)
             return;
         int2 res = queue.pop();
-        MiniBox ax = mini_boxes[res.x];
-        MiniBox bx = mini_boxes[res.y];
+        MiniBox a_mini = mini_boxes[res.x];
+        MiniBox b_mini = mini_boxes[res.y];
 
         // Check for collision, matching simplex pair (edge-edge, vertex-face)
         // and not sharing same vertex.
-        if (does_collide(ax, bx)
-            && AABB::is_valid_pair(ax.vertex_ids, bx.vertex_ids)
-            && !covertex(ax.vertex_ids, bx.vertex_ids)) {
-            add_overlap(
-                ax.box_id, bx.box_id, overlaps, memory_handler->real_count);
+        if (is_valid_pair<is_two_lists>(a_mini.element_id, b_mini.element_id)
+            && a_mini.intersects(b_mini)
+            && !share_a_vertex(a_mini.vertex_ids, b_mini.vertex_ids)) {
+
+            if constexpr (is_two_lists) {
+                // Negative IDs are from the first list
+                add_overlap(
+                    flip_id(min(a_mini.element_id, b_mini.element_id)),
+                    max(a_mini.element_id, b_mini.element_id), //
+                    overlaps, memory_handler->real_count);
+            } else {
+                assert(a_mini.element_id >= 0 && b_mini.element_id >= 0);
+                add_overlap(
+                    min(a_mini.element_id, b_mini.element_id),
+                    max(a_mini.element_id, b_mini.element_id), //
+                    overlaps, memory_handler->real_count);
+            }
         }
 
         // Repeat major axis check and push to queue if they collide.
@@ -196,5 +185,37 @@ __global__ void sweep_and_tiniest_queue(
             (queue.end - queue.start + QUEUE_SIZE) % QUEUE_SIZE;
     }
 }
+
+// === Template instantiation =================================================
+
+template __global__ void sweep_and_prune<false>(
+    const Scalar2* const,
+    const MiniBox* const,
+    const int,
+    const int,
+    RawDeviceBuffer<int2>,
+    MemoryHandler*);
+template __global__ void sweep_and_prune<true>(
+    const Scalar2* const,
+    const MiniBox* const,
+    const int,
+    const int,
+    RawDeviceBuffer<int2>,
+    MemoryHandler*);
+
+template __global__ void sweep_and_tiniest_queue<false>(
+    const Scalar2* const,
+    const MiniBox* const,
+    const int,
+    const int,
+    RawDeviceBuffer<int2>,
+    MemoryHandler*);
+template __global__ void sweep_and_tiniest_queue<true>(
+    const Scalar2* const,
+    const MiniBox* const,
+    const int,
+    const int,
+    RawDeviceBuffer<int2>,
+    MemoryHandler*);
 
 } // namespace scalable_ccd::cuda

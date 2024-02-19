@@ -45,6 +45,7 @@ public:
 
     // TODO: Add function to retrieve the matrix from the device.
 
+    T* data() { return thrust::raw_pointer_cast(m_data.data()); }
     const T* data() const { return thrust::raw_pointer_cast(m_data.data()); }
     size_t size() const { return m_data.size(); }
     size_t rows() const { return m_rows; }
@@ -54,6 +55,25 @@ private:
     size_t m_rows = 0;
     size_t m_cols = 0;
     thrust::device_vector<T> m_data;
+};
+
+template <typename T> struct RawDeviceMatrix {
+    RawDeviceMatrix(const DeviceMatrix<T>& mat)
+        : m_rows(mat.rows())
+        , m_cols(mat.cols())
+        , m_data(mat.data())
+    {
+    }
+
+    __device__ inline const T& operator()(const int row, const int col) const
+    {
+        // Column-major order.
+        return m_data[row + col * m_rows];
+    }
+
+    const size_t m_rows;
+    const size_t m_cols;
+    const T* const m_data;
 };
 
 } // namespace scalable_ccd::cuda

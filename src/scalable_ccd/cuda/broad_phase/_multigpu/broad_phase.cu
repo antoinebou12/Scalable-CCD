@@ -27,8 +27,8 @@ void runBroadPhaseMultiGPU(
     float milliseconds = 0;
     int device_init_id = 0;
 
-    int smemSize;
-    setup(device_init_id, smemSize, threads_per_block, num_boxes_per_thread);
+    int shared_memory_size;
+    setup(device_init_id, shared_memory_size, threads_per_block, num_boxes_per_thread);
 
     cudaSetDevice(device_init_id);
 
@@ -144,7 +144,7 @@ void runBroadPhaseMultiGPU(
 
         int count;
         cudaEventRecord(starts[device_id]);
-        retrieve_collision_pairs<<<grid, block, smemSize>>>(
+        retrieve_collision_pairs<<<grid, block, shared_memory_size>>>(
             d_b, d_count, d_overlaps, num_boxes, guess, num_boxes_per_thread,
             range_start, range_end);
         cudaEventRecord(stops[device_id]);
@@ -162,7 +162,7 @@ void runBroadPhaseMultiGPU(
             // cudaMemset(d_overlaps, 0, sizeof(int2)*(count));
             cudaMemset(d_count, 0, sizeof(int));
             cudaEventRecord(starts[device_id]);
-            retrieve_collision_pairs<<<grid, block, smemSize>>>(
+            retrieve_collision_pairs<<<grid, block, shared_memory_size>>>(
                 d_b, d_count, d_overlaps, num_boxes, count,
                 num_boxes_per_thread, range_start, range_end);
             cudaEventRecord(stops[device_id]);

@@ -23,32 +23,17 @@ public:
 
     void clear();
 
-    const thrust::device_vector<AABB>& build(
-        const Eigen::MatrixXd& V,
-        const Eigen::MatrixXi& E,
-        const Eigen::MatrixXi& F,
-        std::vector<AABB>& boxes,
-        double inflation_radius = 0)
-    {
-        return build(V, V, E, F, boxes, inflation_radius);
-    }
-
-    const thrust::device_vector<AABB>& build(
-        const Eigen::MatrixXd& V0,
-        const Eigen::MatrixXd& V1,
-        const Eigen::MatrixXi& E,
-        const Eigen::MatrixXi& F,
-        std::vector<AABB>& boxes,
-        double inflation_radius = 0)
-    {
-        constructBoxes(V0, V1, E, F, boxes, inflation_radius);
-        return build(boxes);
-    }
+    /// @brief Build the broad phase data structure.
+    /// @param boxes Vector of AABBs
+    /// @return A reference to the boxes stored on the GPU
+    void build(const std::shared_ptr<DeviceAABBs> boxes);
 
     /// @brief Build the broad phase data structure.
     /// @param boxes Vector of AABBs
     /// @return A reference to the boxes stored on the GPU
-    const thrust::device_vector<AABB>& build(const std::vector<AABB>& boxes);
+    void build(
+        const std::shared_ptr<DeviceAABBs> boxesA,
+        const std::shared_ptr<DeviceAABBs> boxesB);
 
     /// @brief Run the STQ broad phase algorithm on the GPU.
     /// This function is called multiple times until all boxes are processed.
@@ -62,32 +47,34 @@ public:
     std::vector<std::pair<int, int>> detect_overlaps();
 
     /// @brief Is the broad phase algorithm complete?
-    bool is_complete() const { return thread_start_box_id >= d_boxes.size(); }
+    bool is_complete() const { return thread_start_box_id >= num_boxes(); }
 
     /// @brief Get the boxes stored on the GPU (unsorted).
-    const thrust::device_vector<AABB>& boxes() { return d_boxes; }
+    std::shared_ptr<DeviceAABBs> boxes() { return d_boxes; }
 
     /// @brief Get the number of boxes stored on the GPU.
-    size_t num_boxes() const { return d_boxes.size(); }
+    size_t num_boxes() const { return d_boxes ? d_boxes->size() : 0; }
 
     /// @brief Get the resulting overlaps stored on the GPU.
+    /// @see detect_overlaps_partial
     const thrust::device_vector<int2>& overlaps() { return d_overlaps; }
 
     int threads_per_block = 32;
 
 private:
-    Dimension calc_sort_dimension() const;
+    Dimension
+    calc_sort_dimension(const thrust::device_vector<AABB>& d_boxes) const;
 
-    int grid_dim_1d() const { return d_boxes.size() / threads_per_block + 1; }
+    int grid_dim_1d() const
+    {
+        assert(d_boxes);
+        return num_boxes() / threads_per_block + 1;
+    }
 
     std::shared_ptr<MemoryHandler> memory_handler;
 
     /// @brief Boxes stored on the GPU
-    thrust::device_vector<AABB> d_boxes;
-    /// @brief Sorted major axis intervals of d_boxes
-    thrust::device_vector<Scalar2> d_sm;
-    /// @brief Sorted min and max values of the non-major axes and vertex information to check for simplex matching and covertices
-    thrust::device_vector<MiniBox> d_mini;
+    std::shared_ptr<DeviceAABBs> d_boxes;
 
     /// @brief Populated with the indices of overlapping boxes upon detect_overlaps_partial()
     thrust::device_vector<int2> d_overlaps;
@@ -98,7 +85,10 @@ private:
     int thread_start_box_id = 0;
     int num_devices = 1;
 
-    int smemSize;
+    int shared_memory_size;
+
+    /// @brief Was the broad phase constructed with two lists of boxes?
+    bool is_two_lists;
 };
 
 } // namespace scalable_ccd::cuda

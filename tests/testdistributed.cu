@@ -72,8 +72,8 @@ void sweep_multigpu(int N, int devcount)
 
     int device_init_id = 0;
 
-    // int smemSize;
-    // setup(device_init_id, smemSize, threads, nbox);
+    // int shared_memory_size;
+    // setup(device_init_id, shared_memory_size, threads, nbox);
 
     cudaSetDevice(device_init_id);
 

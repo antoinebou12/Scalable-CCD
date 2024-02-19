@@ -3,11 +3,11 @@
 #include <scalable_ccd/config.hpp>
 #include <scalable_ccd/cuda/broad_phase/sweep.cuh>
 #include <scalable_ccd/cuda/broad_phase/utils.cuh>
+#include <scalable_ccd/cuda/broad_phase/collision.cuh>
 #include <scalable_ccd/utils/profiler.hpp>
 #include <scalable_ccd/cuda/utils/device_variable.cuh>
 
 #include <thrust/execution_policy.h>
-#include <thrust/sort.h>
 
 #include <tbb/parallel_for.h>
 
@@ -15,18 +15,98 @@
 
 namespace scalable_ccd::cuda {
 
+namespace {
+    __global__ void flip_element_ids(MiniBox* const boxes, int size)
+    {
+        const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+        if (idx < size) {
+            boxes[idx].element_id = flip_id(boxes[idx].element_id);
+        }
+    }
+} // namespace
+
+void BroadPhase::build(const std::shared_ptr<DeviceAABBs> boxes)
+{
+    assert(boxes);
+    assert(thrust::is_sorted(
+        boxes->sorted_major_intervals.begin(),
+        boxes->sorted_major_intervals.end(), SortIntervals()));
+
+    clear();
+
+    logger().debug("Broad-phase: building (# boxes: {:d})", boxes->size());
+
+    if (memory_handler->MAX_OVERLAP_CUTOFF == 0) {
+        memory_handler->MAX_OVERLAP_CUTOFF = boxes->size();
+        logger().trace(
+            "Setting MAX_OVERLAP_CUTOFF to {:d}",
+            memory_handler->MAX_OVERLAP_CUTOFF);
+    }
+
+    setup(
+        device_init_id, shared_memory_size, threads_per_block,
+        num_boxes_per_thread);
+    cudaSetDevice(device_init_id);
+
+    this->d_boxes = boxes; // fast: copying a shared pointer
+
+    is_two_lists = false; // default
+}
+
+void BroadPhase::build(
+    const std::shared_ptr<DeviceAABBs> _boxesA,
+    const std::shared_ptr<DeviceAABBs> boxesB)
+{
+    assert(_boxesA && boxesB);
+    assert(thrust::is_sorted(
+        _boxesA->sorted_major_intervals.begin(),
+        _boxesA->sorted_major_intervals.end(), SortIntervals()));
+    assert(thrust::is_sorted(
+        boxesB->sorted_major_intervals.begin(),
+        boxesB->sorted_major_intervals.end(), SortIntervals()));
+
+    // Explicit copy of boxesA to modify element_id
+    DeviceAABBs boxesA;
+    {
+        SCALABLE_CCD_GPU_PROFILE_POINT("copy_device_aabbs");
+        boxesA = *_boxesA;
+    }
+
+    {
+        SCALABLE_CCD_GPU_PROFILE_POINT("flip_element_ids");
+        constexpr int N = 1024;
+        flip_element_ids<<<boxesA.size() / N + 1, N>>>(
+            thrust::raw_pointer_cast(boxesA.mini_boxes.data()), boxesA.size());
+    }
+
+    std::shared_ptr<DeviceAABBs> boxes = std::make_shared<DeviceAABBs>();
+    {
+        SCALABLE_CCD_GPU_PROFILE_POINT("merge_boxes");
+        boxes->sorted_major_intervals.resize(boxesA.size() + boxesB->size());
+        boxes->mini_boxes.resize(boxesA.size() + boxesB->size());
+        thrust::merge_by_key(
+            boxesA.sorted_major_intervals.begin(),
+            boxesA.sorted_major_intervals.end(),
+            boxesB->sorted_major_intervals.begin(),
+            boxesB->sorted_major_intervals.end(), //
+            boxesA.mini_boxes.begin(), boxesB->mini_boxes.begin(),
+            boxes->sorted_major_intervals.begin(), boxes->mini_boxes.begin(),
+            SortIntervals());
+    }
+
+    build(boxes); // build with the merged boxes
+
+    is_two_lists = true; // override the default
+}
+
 void BroadPhase::clear()
 {
     *memory_handler = MemoryHandler();
 
-    d_boxes.clear();
-    d_boxes.shrink_to_fit();
-
-    d_sm.clear();
-    d_sm.shrink_to_fit();
-
-    d_mini.clear();
-    d_mini.shrink_to_fit();
+    if (d_boxes) {
+        d_boxes->clear();
+        d_boxes->shrink_to_fit();
+    }
 
     d_overlaps.clear();
     d_overlaps.shrink_to_fit();
@@ -37,53 +117,13 @@ void BroadPhase::clear()
     num_devices = 1;
 }
 
-const thrust::device_vector<AABB>&
-BroadPhase::build(const std::vector<AABB>& boxes)
-{
-    logger().debug("Broad-phase: building (# boxes: {:d})", boxes.size());
-
-    if (memory_handler->MAX_OVERLAP_CUTOFF == 0) {
-        memory_handler->MAX_OVERLAP_CUTOFF = boxes.size();
-        logger().trace(
-            "Setting MAX_OVERLAP_CUTOFF to {:d}",
-            memory_handler->MAX_OVERLAP_CUTOFF);
-    }
-
-    setup(device_init_id, smemSize, threads_per_block, num_boxes_per_thread);
-    cudaSetDevice(device_init_id);
-
-    d_boxes = boxes; // copy to device
-    d_sm.resize(boxes.size());
-    d_mini.resize(boxes.size());
-
-    // const Dimension axis = calc_sort_dimension();
-    const Dimension axis = x;
-
-    // Initialize d_sm and d_mini
-    {
-        SCALABLE_CCD_GPU_PROFILE_POINT("splitBoxes");
-        split_boxes<<<grid_dim_1d(), threads_per_block>>>(
-            thrust::raw_pointer_cast(d_boxes.data()),
-            thrust::raw_pointer_cast(d_sm.data()),
-            thrust::raw_pointer_cast(d_mini.data()), d_boxes.size(), axis);
-        gpuErrchk(cudaDeviceSynchronize());
-    }
-
-    {
-        SCALABLE_CCD_GPU_PROFILE_POINT("sortingBoxes");
-        // Only sort the split boxes and keep the d_boxes unsorted
-        thrust::sort_by_key(
-            thrust::device, d_sm.begin(), d_sm.end(), d_mini.begin(),
-            sort_aabb_x());
-    }
-
-    gpuErrchk(cudaGetLastError());
-
-    return d_boxes;
-}
-
 const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
 {
+    if (!d_boxes) {
+        throw std::runtime_error(
+            "Must initialize build broad phase before detecting overlaps!");
+    }
+
     logger().debug("Broad-phase: detecting overlaps (partial)");
 
     memory_handler->setOverlapSize();
@@ -110,15 +150,39 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
             SCALABLE_CCD_GPU_PROFILE_POINT("STQ");
 
 #ifdef SCALABLE_CCD_USE_CUDA_SAP
-            sweep_and_prune<<<grid_dim_1d(), threads_per_block>>>(
-                thrust::raw_pointer_cast(d_sm.data()),
-                thrust::raw_pointer_cast(d_mini.data()), num_boxes(),
-                thread_start_box_id, d_overlaps_buffer, &d_memory_handler);
+            if (is_two_lists) {
+                sweep_and_prune<true><<<grid_dim_1d(), threads_per_block>>>(
+                    thrust::raw_pointer_cast(
+                        d_boxes->sorted_major_intervals.data()),
+                    thrust::raw_pointer_cast(d_boxes->mini_boxes.data()),
+                    num_boxes(), thread_start_box_id, d_overlaps_buffer,
+                    &d_memory_handler);
+            } else {
+                sweep_and_prune<false><<<grid_dim_1d(), threads_per_block>>>(
+                    thrust::raw_pointer_cast(
+                        d_boxes->sorted_major_intervals.data()),
+                    thrust::raw_pointer_cast(d_boxes->mini_boxes.data()),
+                    num_boxes(), thread_start_box_id, d_overlaps_buffer,
+                    &d_memory_handler);
+            }
 #else
-            sweep_and_tiniest_queue<<<grid_dim_1d(), threads_per_block>>>(
-                thrust::raw_pointer_cast(d_sm.data()),
-                thrust::raw_pointer_cast(d_mini.data()), num_boxes(),
-                thread_start_box_id, d_overlaps_buffer, &d_memory_handler);
+            if (is_two_lists) {
+                sweep_and_tiniest_queue<true>
+                    <<<grid_dim_1d(), threads_per_block>>>(
+                        thrust::raw_pointer_cast(
+                            d_boxes->sorted_major_intervals.data()),
+                        thrust::raw_pointer_cast(d_boxes->mini_boxes.data()),
+                        num_boxes(), thread_start_box_id, d_overlaps_buffer,
+                        &d_memory_handler);
+            } else {
+                sweep_and_tiniest_queue<false>
+                    <<<grid_dim_1d(), threads_per_block>>>(
+                        thrust::raw_pointer_cast(
+                            d_boxes->sorted_major_intervals.data()),
+                        thrust::raw_pointer_cast(d_boxes->mini_boxes.data()),
+                        num_boxes(), thread_start_box_id, d_overlaps_buffer,
+                        &d_memory_handler);
+            }
 #endif
 
             gpuErrchk(cudaDeviceSynchronize());
@@ -128,7 +192,7 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
 
         if (d_overlaps_buffer.size() < memory_handler->real_count) {
             logger().debug(
-                "Found {:d} overlaps, but {:d} exist; re-running.",
+                "Found {:d} overlaps, but {:d} exist; re-running",
                 d_overlaps_buffer.size(), memory_handler->real_count);
 
             // Increase MAX_OVERLAP_SIZE (or decrease MAX_OVERLAP_CUTOFF)
@@ -143,6 +207,7 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
 
     // Move overlaps from buffer to d_overlaps
     if (d_overlaps_buffer.size() > 0) {
+        SCALABLE_CCD_GPU_PROFILE_POINT("copy_overlaps_from_buffer");
         d_overlaps = thrust::device_vector<int2>(
             d_overlaps_buffer.begin(), d_overlaps_buffer.end());
     } else {
@@ -170,12 +235,14 @@ std::vector<std::pair<int, int>> BroadPhase::detect_overlaps()
     while (!is_complete()) {
         detect_overlaps_partial();
 
-        const int n = overlaps.size();
-        overlaps.resize(n + d_overlaps.size());
-
-        gpuErrchk(cudaMemcpy(
-            &overlaps[n], thrust::raw_pointer_cast(d_overlaps.data()),
-            d_overlaps.size() * sizeof(int2), cudaMemcpyDeviceToHost));
+        {
+            SCALABLE_CCD_CPU_PROFILE_POINT("copy_overlaps_to_host");
+            const int n = overlaps.size();
+            overlaps.resize(n + d_overlaps.size());
+            gpuErrchk(cudaMemcpy(
+                &overlaps[n], thrust::raw_pointer_cast(d_overlaps.data()),
+                d_overlaps.size() * sizeof(int2), cudaMemcpyDeviceToHost));
+        }
     }
 
     logger().debug("Complete overlaps size {:d}", overlaps.size());
@@ -185,7 +252,8 @@ std::vector<std::pair<int, int>> BroadPhase::detect_overlaps()
 
 // ----------------------------------------------------------------------------
 
-Dimension BroadPhase::calc_sort_dimension() const
+Dimension BroadPhase::calc_sort_dimension(
+    const thrust::device_vector<AABB>& d_boxes) const
 {
     // mean of all box points (used to find best axis)
     thrust::device_vector<Scalar3> d_mean(1, make_Scalar3(0, 0, 0));

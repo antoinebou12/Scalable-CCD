@@ -25,19 +25,6 @@ __global__ void calc_variance(
     const Scalar3* const mean,
     Scalar3* var);
 
-/// @brief Splits each box into 2 different objects to improve performance
-/// @param boxes Boxes to be rearranged
-/// @param sortedmin Contains the sorted min and max values of the non-major axes
-/// @param mini Contains the vertex information of the boxes
-/// @param num_boxes Number of boxes
-/// @param axis Major axis
-__global__ void split_boxes(
-    const AABB* const boxes,
-    Scalar2* sortedmin,
-    MiniBox* mini,
-    const int num_boxes,
-    const Dimension axis);
-
 /// @brief Runs the sweep and prune tiniest queue (STQ) algorithm
 /// @param sortedMajorAxis Contains the sorted min and max values of the major axis
 /// @param boxVerts Contains the sorted min and max values of the non-major axes and vertex information to check for simplex matching and covertices
@@ -45,6 +32,7 @@ __global__ void split_boxes(
 /// @param start_box_id Starting box index
 /// @param overlaps Final output array of colliding box pairs
 /// @param memory_handler Memory handler
+template <bool is_two_lists>
 __global__ void sweep_and_tiniest_queue(
     const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,
@@ -60,6 +48,7 @@ __global__ void sweep_and_tiniest_queue(
 /// @param start_box_id Starting box index
 /// @param overlaps Final output array of colliding box pairs
 /// @param memory_handler Memory handler
+template <bool is_two_lists>
 __global__ void sweep_and_prune(
     const Scalar2* const sortedMajorAxis,
     const MiniBox* const boxVerts,

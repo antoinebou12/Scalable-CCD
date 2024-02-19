@@ -3,7 +3,6 @@ set(SOURCES
     aabb.cuh
     broad_phase.cu
     broad_phase.cuh
-    collision.cu
     collision.cuh
     queue.cu
     queue.cuh
