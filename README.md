@@ -53,19 +53,14 @@ The following libraries are used in this project:
 
 ##### Optional
 
+* [CUDA](https://developer.nvidia.com/cuda-toolkit): GPU acceleration
+	* Required when using the CMake option `SCALABLE_CCD_WITH_CUDA`
 * [nlohmann/json](https://github.com/nlohmann/json): saving profiler data
-    * Enable by using the CMake option `SCALABLE_CCD_WITH_PROFILER`
-* [rational-cpp](https://github.io/zfergus/rational-cpp): rational arithmetic used for exact intersection checks
-    * Enable by using the CMake option `SCALABLE_CCD_TOI_PER_QUERY`
-    * Requires [GMP](https://gmplib.org/) to be installed at a system level
+    * Required when using the CMake option `SCALABLE_CCD_WITH_PROFILER`
 
 ## Usage
 
 :hammer_and_wrench: **ToDo**: Write usage instructions.
-
-## Contributing
-
-Please read CONTRIBUTING.md for details on our code of conduct, and the process for submitting pull requests to us.
 
 ## Citation
 
