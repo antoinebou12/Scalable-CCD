@@ -12,7 +12,7 @@
 
 #include <tbb/parallel_for.h>
 
-#define SCALABLE_CCD_USE_CUDA_SAP // for comparison with SAP
+// #define SCALABLE_CCD_USE_CUDA_SAP // for comparison with SAP
 
 namespace scalable_ccd::cuda {
 
@@ -148,9 +148,8 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
         d_memory_handler = *memory_handler; // Update memory handler on device
 
         {
-            SCALABLE_CCD_GPU_PROFILE_POINT("STQ");
-
 #ifdef SCALABLE_CCD_USE_CUDA_SAP
+            SCALABLE_CCD_GPU_PROFILE_POINT("sweep_and_prune");
             if (is_two_lists) {
                 sweep_and_prune<true><<<grid_dim_1d(), threads_per_block>>>(
                     thrust::raw_pointer_cast(
@@ -167,6 +166,7 @@ const thrust::device_vector<int2>& BroadPhase::detect_overlaps_partial()
                     &d_memory_handler);
             }
 #else
+            SCALABLE_CCD_GPU_PROFILE_POINT("sweep_and_tiniest_queue");
             if (is_two_lists) {
                 sweep_and_tiniest_queue<true>
                     <<<grid_dim_1d(), threads_per_block>>>(

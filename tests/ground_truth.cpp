@@ -34,7 +34,7 @@ void compare_mathematica(
     {
         std::ifstream in(ground_truth_file);
         REQUIRE(in.good());
-        logger().trace(
+        logger().info(
             "Comparing mathematica file {:s}", ground_truth_file.string());
 
         const json j = json::parse(in);

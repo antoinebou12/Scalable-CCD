@@ -27,7 +27,7 @@ else()
         PREFIX ${FETCHCONTENT_BASE_DIR}/scalable-ccd-test-data
         SOURCE_DIR ${SCALABLE_CCD_DATA_DIR}
         GIT_REPOSITORY https://github.com/Continuous-Collision-Detection/Sample-Scalable-CCD-Data
-        GIT_TAG ac7b75447daeeac76c1a1f20ac4dacfdeaf09f6d
+        GIT_TAG f24a3b153bf0961f182a716caad49a4b13c98dbe
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
         INSTALL_COMMAND ""

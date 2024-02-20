@@ -60,18 +60,14 @@ __global__ void sweep_and_prune(
         return;
 
     int next_box_id = box_id + 1;
-    int delta = 1;
 
     if (box_id >= num_boxes || next_box_id >= num_boxes)
         return;
 
-    const Scalar2& a = sorted_major_axis[box_id];
-
-    Scalar b_x;
-    b_x = __shfl_down_sync(0xffffffff, a.x, delta); // ???
-    b_x = sorted_major_axis[next_box_id].x;
-
+    const Scalar2 a = sorted_major_axis[box_id];
     const MiniBox a_mini = mini_boxes[box_id];
+
+    Scalar b_x = sorted_major_axis[next_box_id].x;
     MiniBox b_mini = mini_boxes[next_box_id];
 
     while (a.y >= b_x && next_box_id < num_boxes) {
@@ -94,10 +90,8 @@ __global__ void sweep_and_prune(
             }
         }
 
-        next_box_id++;
-        delta++;
+        ++next_box_id;
         if (next_box_id < num_boxes) {
-            b_x = __shfl_down_sync(0xffffffff, a.x, delta);
             b_x = sorted_major_axis[next_box_id].x;
             b_mini = mini_boxes[next_box_id];
         }
@@ -113,6 +107,8 @@ __global__ void sweep_and_tiniest_queue(
     RawDeviceBuffer<int2> overlaps,
     MemoryHandler* memory_handler)
 {
+    assert(blockDim.x <= warpSize); // Allow for warp-synchronous programming
+
     // Initialize shared queue for threads to push collisions onto
     __shared__ Queue queue;
     queue.start = 0;
@@ -133,10 +129,9 @@ __global__ void sweep_and_tiniest_queue(
     // If box_id and box_id+1 boxes collide on major axis, then push them onto
     // the queue.
     if (a_max >= b_min) {
-        const bool success = queue.push(make_int2(box_id, box_id + 1));
-        assert(success);
+        queue.push(make_int2(box_id, box_id + 1));
     }
-    __syncthreads();
+    __syncwarp();
     queue.nbr_per_loop = queue.end - queue.start;
 
     // Retrieve the next pair of boxes from the queue and check if they collide
@@ -158,14 +153,14 @@ __global__ void sweep_and_tiniest_queue(
                 // Negative IDs are from the first list
                 add_overlap(
                     flip_id(min(a_mini.element_id, b_mini.element_id)),
-                    max(a_mini.element_id, b_mini.element_id), //
-                    overlaps, memory_handler->real_count);
+                    max(a_mini.element_id, b_mini.element_id), overlaps,
+                    memory_handler->real_count);
             } else {
                 assert(a_mini.element_id >= 0 && b_mini.element_id >= 0);
                 add_overlap(
                     min(a_mini.element_id, b_mini.element_id),
-                    max(a_mini.element_id, b_mini.element_id), //
-                    overlaps, memory_handler->real_count);
+                    max(a_mini.element_id, b_mini.element_id), overlaps,
+                    memory_handler->real_count);
             }
         }
 
@@ -176,10 +171,10 @@ __global__ void sweep_and_tiniest_queue(
         a_max = sorted_major_axis[res.x].y;
         b_min = sorted_major_axis[res.y + 1].x;
         if (a_max >= b_min) {
-            res.y += 1;
+            ++res.y;
             queue.push(res);
         }
-        __syncthreads();
+        __syncwarp();
         // Update the number of boxes to be processed in the queue
         queue.nbr_per_loop =
             (queue.end - queue.start + QUEUE_SIZE) % QUEUE_SIZE;

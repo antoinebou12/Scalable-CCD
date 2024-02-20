@@ -4,7 +4,6 @@ set(SOURCES
     broad_phase.cu
     broad_phase.cuh
     collision.cuh
-    queue.cu
     queue.cuh
     sweep.cu
     sweep.cuh

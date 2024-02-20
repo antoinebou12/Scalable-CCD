@@ -57,7 +57,7 @@ public:
         current_scope.pop_back();
     }
 
-    void print() const { logger().info("profiler: {}", m_data.dump(2)); }
+    void print() const { logger().trace("profiler: {}", m_data.dump(2)); }
 
     const nlohmann::json& data() const { return m_data; }
     nlohmann::json& data() { return m_data; }
