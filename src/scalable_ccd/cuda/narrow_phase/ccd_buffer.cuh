@@ -26,7 +26,7 @@ struct CCDBuffer {
     {
         if (is_full()) {
             atomicCAS(&m_overflow_flag, 0, 1);
-            return;
+            return m_data[m_tail]; // Return a dummy value
         }
         const int i = atomicInc(&m_tail, m_capacity - 1);
         m_data[i] = val;
