@@ -4,6 +4,8 @@
 
 #include <tbb/parallel_for.h>
 
+#include <cassert>
+
 namespace scalable_ccd {
 
 AABB::AABB(const ArrayMax3& _min, const ArrayMax3& _max) : min(_min), max(_max)
