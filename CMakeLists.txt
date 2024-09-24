@@ -165,11 +165,13 @@ if(SCALABLE_CCD_WITH_CUDA)
     message(FATAL_ERROR "No CUDA support found!")
   endif()
 
-  # We need to explicitly state that we need all CUDA files in the particle
-  # library to be built with -dc as the member functions could be called by
-  # other libraries and executables.
+  # Enable separable compilation for CUDA
   set_target_properties(scalable_ccd PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
+  # We need to explicitly state that we need all CUDA files in the particle
+  # Enable separable compilation for CUDA
+  # library to be built with -dc as the member functions could be called by
+  # other libraries and executables.
   if(DEFINED SCALABLE_CCD_CUDA_ARCHITECTURES)
     message(STATUS "CUDA_ARCHITECTURES was specified, skipping auto-detection")
     set(CMAKE_CUDA_ARCHITECTURES ${SCALABLE_CCD_CUDA_ARCHITECTURES})
@@ -189,21 +191,34 @@ if(SCALABLE_CCD_WITH_CUDA)
 
   if(APPLE)
     # We need to add the path to the driver (libcuda.dylib) as an rpath,
+    # Add rpath for CUDA on macOS
     # so that the static cuda runtime can find it at runtime.
     set_property(TARGET scalable_ccd
       PROPERTY
       BUILD_RPATH ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
   endif()
 
-  target_compile_options(scalable_ccd PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
-    --generate-line-info
-    --use_fast_math
-    --relocatable-device-code=true
-
-    # --ptxas-options=-v
-    # --maxrregcount=7
-    -fPIC # https://stackoverflow.com/questions/5311515/gcc-fpic-option
-    >)
+  # Conditionally add CUDA compile options based on the platform
+  if(WIN32)
+    target_compile_options(scalable_ccd PRIVATE 
+      $<$<COMPILE_LANGUAGE:CUDA>:
+        --generate-line-info
+        --use_fast_math
+        --relocatable-device-code=true
+      >
+    )
+  else()
+    target_compile_options(scalable_ccd PRIVATE 
+      $<$<COMPILE_LANGUAGE:CUDA>:
+        --generate-line-info
+        --use_fast_math
+        --relocatable-device-code=true
+        # --ptxas-options=-v
+        # --maxrregcount=7
+        -fPIC # https://stackoverflow.com/questions/5311515/gcc-fpic-option
+      >
+    )
+  endif()
 
   find_package(CUDAToolkit)
   target_link_libraries(scalable_ccd PUBLIC CUDA::cudart)
