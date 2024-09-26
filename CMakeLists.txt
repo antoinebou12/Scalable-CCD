@@ -166,11 +166,9 @@ if(SCALABLE_CCD_WITH_CUDA)
   endif()
 
   # We need to explicitly state that we need all CUDA files in the particle
-  # Enable separable compilation for CUDA
   # library to be built with -dc as the member functions could be called by
   # other libraries and executables.
-  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-  set_target_properties(scalable_ccd PROPERTIES CUDA_SEPARABLE_COMPILATION ON POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(scalable_ccd PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   
   if(DEFINED SCALABLE_CCD_CUDA_ARCHITECTURES)
     message(STATUS "CUDA_ARCHITECTURES was specified, skipping auto-detection")
