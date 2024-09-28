@@ -1,7 +1,6 @@
 name: Build
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -108,7 +107,7 @@ jobs:
       - name: Tests
         run: cd build; ctest --verbose -j ${{ steps.cpu-cores.outputs.count }}
 
-  build_cuda: # no runtime support for CUDA, so only build on Linux
+  build_cuda:
     name: ${{ matrix.name }} CUDA (${{ matrix.config }}) - CUDA ${{ matrix.cuda }}
     runs-on: ${{ matrix.os }}
     strategy:
