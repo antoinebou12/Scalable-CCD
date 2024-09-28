@@ -35,7 +35,7 @@ jobs:
       - name: Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get install ccache
+          sudo apt-get install -y ccache
           echo 'CACHE_PATH=~/.cache/ccache' >> "$GITHUB_ENV"
 
       - name: Dependencies (macOS)
@@ -116,7 +116,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         config: [Debug, Release]
-        cuda: ['12.5.0', '11.8.0'] # Add other CUDA versions you want to test
+        cuda: ['12.5.0', '11.8.0']
         include:
           - os: ubuntu-latest
             name: Linux
@@ -133,6 +133,7 @@ jobs:
           fetch-depth: 10
 
       - name: Dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get install -y ccache
           echo 'CACHE_PATH=~/.cache/ccache' >> "$GITHUB_ENV"
